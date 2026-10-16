@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
-import { Building2, CheckCircle2, ChevronRight, Download, FileText, FolderCog, Layers3, Loader2, Mail, Plus, Settings2, ShieldCheck, Tags, Users, UserPlus } from "lucide-react";
+import { Building2, CheckCircle2, ChevronRight, Download, FileText, FolderCog, Layers3, Loader2, Mail, Plus, Settings2, ShieldCheck, Tags, Trash2, Users, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -76,6 +76,19 @@ export default function Admin() {
   const setUserActive = trpc.admin.setActive.useMutation({ onSuccess: () => { toast.success("Acesso atualizado"); void users.refetch(); }, onError: error => toast.error(error.message) });
   const setManagerScopes = trpc.admin.setManagerScopes.useMutation({ onSuccess: () => { toast.success("Escopo do gestor atualizado"); void managerScopes.refetch(); }, onError: error => toast.error(error.message) });
   const downloadAttachment = trpc.tickets.downloadAttachment.useMutation({ onSuccess: result => window.open(result.url, "_blank", "noopener,noreferrer"), onError: error => toast.error(error.message) });
+  const clearCatalog = trpc.admin.clearCatalog.useMutation({
+    onSuccess: () => {
+      toast.success("Todos os setores, equipes, filas e tipos de chamado foram apagados do banco!");
+      void departments.refetch();
+      void teams.refetch();
+      void queues.refetch();
+      void ticketTypes.refetch();
+      void categories.refetch();
+      void services.refetch();
+      void users.refetch();
+    },
+    onError: error => toast.error(error.message),
+  });
 
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-[#f6f7fb]"><Loader2 className="size-6 animate-spin text-[#3157d5]" /></div>;
   if (!user) return <div className="p-8 text-center">Faça login para acessar a administração.</div>;
@@ -102,7 +115,39 @@ export default function Admin() {
         <TabsContent value="catalog" className="mt-6 space-y-6"><Card className="border-[#e5e8f0] shadow-none"><CardHeader><SectionIntro icon={Tags} eyebrow="Passo 2 · Classificação" title="Tipos de chamado" description="Defina as opções que o solicitante verá ao abrir um chamado, como Incidente, Requisição ou Problema." tone="purple" /></CardHeader><CardContent><div className="grid gap-3 rounded-2xl border border-[#edf0f5] bg-[#fbfcfe] p-4 md:grid-cols-[1fr_1.5fr_auto]"><Input value={typeName} onChange={event => setTypeName(event.target.value)} placeholder="Nome do tipo" /><Input value={typeDescription} onChange={event => setTypeDescription(event.target.value)} placeholder="Descrição curta para orientar o solicitante" /><Button disabled={createTicketType.isPending || typeName.trim().length < 2} onClick={() => createTicketType.mutate({ name: typeName, description: typeDescription })}><Plus className="mr-2 size-4" /> Criar tipo</Button></div><div className="mt-5 grid gap-3 md:grid-cols-2">{(ticketTypes.data ?? []).length === 0 ? <EmptyState>Nenhum tipo de chamado cadastrado.</EmptyState> : (ticketTypes.data ?? []).map(item => <div key={item.id} className="rounded-xl border border-[#edf0f5] bg-white p-4"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-[#253252]">{item.name}</p><Badge variant="outline" className="border-[#b9e7d2] text-[10px] text-[#147b55]">Ativo</Badge></div><p className="mt-2 text-xs leading-5 text-[#8791a5]">{item.description || "Sem descrição cadastrada."}</p></div>)}</div></CardContent></Card><Card className="border-[#e5e8f0] shadow-none"><CardHeader><SectionIntro icon={Layers3} eyebrow="Passo 3 · Catálogo de serviços" title="Categorias e serviços" description="Categorias organizam o catálogo. Serviços são as opções específicas que direcionam o atendimento." tone="amber" /></CardHeader><CardContent><div className="grid gap-6 lg:grid-cols-2"><div className="rounded-2xl border border-[#edf0f5] bg-[#fbfcfe] p-4"><p className="text-sm font-semibold text-[#253252]">Nova categoria</p><div className="mt-4 grid gap-2 sm:grid-cols-[1fr_130px]"><Input value={categoryName} onChange={event => setCategoryName(event.target.value)} placeholder="Nome da categoria" /><Input value={categoryCode} onChange={event => setCategoryCode(event.target.value)} placeholder="Código" /></div><select value={categoryParentId ?? ""} onChange={event => setCategoryParentId(Number(event.target.value) || undefined)} className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Categoria raiz</option>{(categories.data ?? []).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><Button className="mt-3 w-full" disabled={createCategory.isPending || categoryName.trim().length < 2 || categoryCode.trim().length < 2} onClick={() => createCategory.mutate({ name: categoryName, code: categoryCode, parentId: categoryParentId })}><Plus className="mr-2 size-4" /> Criar categoria</Button><div className="mt-5 space-y-2">{(categories.data ?? []).map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-[#edf0f5] bg-white px-3 py-3"><div><p className="text-sm font-medium text-[#253252]">{item.parentId ? "↳ " : ""}{item.name}</p><p className="mono mt-1 text-[10px] text-[#8791a5]">{item.code}</p></div><Badge variant="outline" className="text-[10px]">Ativa</Badge></div>)}</div></div><div className="rounded-2xl border border-[#edf0f5] bg-[#fbfcfe] p-4"><p className="text-sm font-semibold text-[#253252]">Novo serviço</p><div className="mt-4 grid gap-2 sm:grid-cols-[1fr_130px]"><Input value={serviceName} onChange={event => setServiceName(event.target.value)} placeholder="Nome do serviço" /><Input value={serviceCode} onChange={event => setServiceCode(event.target.value)} placeholder="Código" /></div><select value={serviceCategoryId ?? ""} onChange={event => setServiceCategoryId(Number(event.target.value) || undefined)} className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Selecione a categoria</option>{(categories.data ?? []).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><Button className="mt-3 w-full" disabled={createService.isPending || serviceName.trim().length < 2 || serviceCode.trim().length < 2 || !serviceCategoryId} onClick={() => createService.mutate({ name: serviceName, code: serviceCode, categoryId: serviceCategoryId! })}><Plus className="mr-2 size-4" /> Criar serviço</Button><div className="mt-5 space-y-2">{(services.data ?? []).map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-[#edf0f5] bg-white px-3 py-3"><div><p className="text-sm font-medium text-[#253252]">{item.name}</p><p className="mono mt-1 text-[10px] text-[#8791a5]">{item.code} · {categories.data?.find(category => category.id === item.categoryId)?.name ?? `Categoria #${item.categoryId}`}</p></div><CheckCircle2 className="size-4 text-[#147b55]" /></div>)}</div></div></div></CardContent></Card></TabsContent>
 
 
-        <TabsContent value="operations" className="mt-6 space-y-6"><Card className="border-[#e5e8f0] shadow-none"><CardHeader><SectionIntro icon={FolderCog} eyebrow="Controle e rastreabilidade" title="Arquivos e auditoria" description="Acompanhe anexos persistidos e eventos de segurança sem misturar essas tarefas com os cadastros do dia a dia." tone="purple" /></CardHeader><CardContent><div className="grid gap-6 lg:grid-cols-2"><div><h3 className="text-sm font-semibold text-[#253252]">Arquivos dos chamados</h3><p className="mt-1 text-xs text-[#8791a5]">Índice operacional dos anexos armazenados.</p><div className="mt-4 space-y-2">{attachments.isLoading ? <Loader2 className="size-5 animate-spin text-[#3157d5]" /> : (attachments.data ?? []).length === 0 ? <EmptyState>Nenhum anexo cadastrado.</EmptyState> : (attachments.data ?? []).map(file => <div key={file.id} className="flex items-center gap-3 rounded-xl border border-[#edf0f5] bg-white p-3"><FileText className="size-4 shrink-0 text-[#3157d5]" /><span className="min-w-0 flex-1 truncate text-xs text-[#526079]">{file.fileName}</span><span className="text-[10px] text-[#8791a5]">#{file.ticketId}</span><Button variant="ghost" size="sm" onClick={() => downloadAttachment.mutate({ attachmentId: file.id })}><Download className="mr-1.5 size-3.5" /> Baixar</Button></div>)}</div></div><div><h3 className="text-sm font-semibold text-[#253252]">Auditoria operacional</h3><p className="mt-1 text-xs text-[#8791a5]">Acessos negados, transições inválidas e eventos de segurança.</p><div className="mt-4 divide-y divide-[#edf0f5] rounded-xl border border-[#edf0f5] bg-white px-3">{audit.isLoading ? <Loader2 className="my-5 size-5 animate-spin text-[#3157d5]" /> : (audit.data ?? []).length === 0 ? <p className="py-6 text-center text-xs text-[#8791a5]">Nenhum evento registrado.</p> : (audit.data ?? []).slice(0, 12).map(item => <div key={item.id} className="flex flex-col gap-1 py-3"><p className="text-xs font-semibold text-[#253252]">{item.action}</p><p className="mono text-[10px] text-[#8791a5]">{item.resource}{item.ticketId ? ` · ticket #${item.ticketId}` : ""} · {new Date(item.createdAt).toLocaleString("pt-BR")}</p></div>)}</div></div></div></CardContent></Card></TabsContent>
+        <TabsContent value="operations" className="mt-6 space-y-6">
+          <Card className="border-[#fecaca] bg-[#fff8f8] shadow-none">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-[#fee2e2] p-2.5 text-[#dc2626]">
+                  <Trash2 className="size-4" />
+                </div>
+                <div>
+                  <p className="eyebrow text-[#dc2626]">Zona de gerenciamento de dados</p>
+                  <h2 className="mt-1 text-lg font-semibold text-[#991b1b]">Limpeza de catálogo e dados operacionais</h2>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-[#b91c1c]">
+                    Apaga todos os setores, equipes, filas de atendimento, tipos de chamado, categorias e serviços do banco de dados, além de chamados de teste. As contas de usuário são mantidas intactas.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="destructive"
+                className="bg-[#dc2626] hover:bg-[#b91c1c] text-white"
+                disabled={clearCatalog.isPending}
+                onClick={() => {
+                  if (window.confirm("Atenção: Tem certeza de que deseja apagar todos os setores, equipes, filas e tipos de chamado do banco de dados?")) {
+                    clearCatalog.mutate();
+                  }
+                }}
+              >
+                {clearCatalog.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
+                Apagar todos os setores, equipes e tipos de chamado
+              </Button>
+            </CardContent>
+          </Card>
+          <Card className="border-[#e5e8f0] shadow-none"><CardHeader><SectionIntro icon={FolderCog} eyebrow="Controle e rastreabilidade" title="Arquivos e auditoria" description="Acompanhe anexos persistidos e eventos de segurança sem misturar essas tarefas com os cadastros do dia a dia." tone="purple" /></CardHeader><CardContent><div className="grid gap-6 lg:grid-cols-2"><div><h3 className="text-sm font-semibold text-[#253252]">Arquivos dos chamados</h3><p className="mt-1 text-xs text-[#8791a5]">Índice operacional dos anexos armazenados.</p><div className="mt-4 space-y-2">{attachments.isLoading ? <Loader2 className="size-5 animate-spin text-[#3157d5]" /> : (attachments.data ?? []).length === 0 ? <EmptyState>Nenhum anexo cadastrado.</EmptyState> : (attachments.data ?? []).map(file => <div key={file.id} className="flex items-center gap-3 rounded-xl border border-[#edf0f5] bg-white p-3"><FileText className="size-4 shrink-0 text-[#3157d5]" /><span className="min-w-0 flex-1 truncate text-xs text-[#526079]">{file.fileName}</span><span className="text-[10px] text-[#8791a5]">#{file.ticketId}</span><Button variant="ghost" size="sm" onClick={() => downloadAttachment.mutate({ attachmentId: file.id })}><Download className="mr-1.5 size-3.5" /> Baixar</Button></div>)}</div></div><div><h3 className="text-sm font-semibold text-[#253252]">Auditoria operacional</h3><p className="mt-1 text-xs text-[#8791a5]">Acessos negados, transições inválidas e eventos de segurança.</p><div className="mt-4 divide-y divide-[#edf0f5] rounded-xl border border-[#edf0f5] bg-white px-3">{audit.isLoading ? <Loader2 className="my-5 size-5 animate-spin text-[#3157d5]" /> : (audit.data ?? []).length === 0 ? <p className="py-6 text-center text-xs text-[#8791a5]">Nenhum evento registrado.</p> : (audit.data ?? []).slice(0, 12).map(item => <div key={item.id} className="flex flex-col gap-1 py-3"><p className="text-xs font-semibold text-[#253252]">{item.action}</p><p className="mono text-[10px] text-[#8791a5]">{item.resource}{item.ticketId ? ` · ticket #${item.ticketId}` : ""} · {new Date(item.createdAt).toLocaleString("pt-BR")}</p></div>)}</div></div></div></CardContent></Card></TabsContent>
         <TabsContent value="people" className="mt-6 space-y-6">
           <Card className="border-[#e5e8f0] shadow-none">
             <CardHeader>

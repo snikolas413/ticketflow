@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 import { randomBytes, scrypt as nodeScrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -844,4 +844,29 @@ export async function failAiRequest(id: number, errorMessage: string) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
   await db.update(aiAssistanceRequests).set({ status: "failed", errorMessage: errorMessage.slice(0, 500), completedAt: new Date() }).where(eq(aiAssistanceRequests.id, id));
+}
+
+export async function clearCatalogAndTickets(admin: User) {
+  if (admin.role !== "admin") throw new Error("Acesso restrito a administradores");
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  await db.execute(sql`UPDATE "users" SET "departmentId" = NULL, "teamId" = NULL`);
+  await db.execute(sql`UPDATE "userInvitations" SET "departmentId" = NULL, "teamId" = NULL`);
+  await db.execute(sql`DELETE FROM "managerScopes"`);
+  await db.execute(sql`DELETE FROM "userRoles"`);
+  await db.execute(sql`DELETE FROM "aiAssistanceRequests"`);
+  await db.execute(sql`DELETE FROM "ticketEvents"`);
+  await db.execute(sql`DELETE FROM "ticketAttachments"`);
+  await db.execute(sql`DELETE FROM "ticketComments"`);
+  await db.execute(sql`DELETE FROM "ticketApprovals"`);
+  await db.execute(sql`DELETE FROM "tickets"`);
+  await db.execute(sql`DELETE FROM "services"`);
+  await db.execute(sql`DELETE FROM "serviceCategories"`);
+  await db.execute(sql`DELETE FROM "ticketTypes"`);
+  await db.execute(sql`DELETE FROM "queues"`);
+  await db.execute(sql`DELETE FROM "teams"`);
+  await db.execute(sql`DELETE FROM "departments"`);
+
+  return { success: true };
 }

@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { authenticateLocalUser, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listUsersForAdmin, localSetupStatus, markNotificationRead, replaceManagerScopes, requestApproval, setUserActive, setUserProfile, transitionTicket } from "./db";
+import { authenticateLocalUser, clearCatalogAndTickets, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listUsersForAdmin, localSetupStatus, markNotificationRead, replaceManagerScopes, requestApproval, setUserActive, setUserProfile, transitionTicket } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { COOKIE_NAME } from "@shared/const";
@@ -95,6 +95,10 @@ export const appRouter = router({
       return listAllAttachments(ctx.user);
     }),
     audit: protectedProcedure.query(({ ctx }) => { adminOnly(ctx.user.role); return listAuditLogs(ctx.user); }),
+    clearCatalog: protectedProcedure.mutation(({ ctx }) => {
+      adminOnly(ctx.user.role);
+      return clearCatalogAndTickets(ctx.user);
+    }),
   }),
   notifications: router({
     list: protectedProcedure.query(({ ctx }) => listNotifications(ctx.user)),

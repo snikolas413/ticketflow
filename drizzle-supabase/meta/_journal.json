@@ -8,6 +8,13 @@
       "when": 1792168903686,
       "tag": "0000_initial_supabase",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792190000000,
+      "tag": "0001_delete_catalog_data",
+      "breakpoints": true
     }
   ]
 }
