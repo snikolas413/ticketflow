@@ -1,0 +1,1 @@
+{"routes":[{"path":"/login","title":"Login corporativo"},{"path":"/","title":"Painel de operações"},{"path":"/tickets/:id","title":"Detalhe do chamado"},{"path":"/admin","title":"Administração"}]}
