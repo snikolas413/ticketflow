@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { authenticateLocalUser, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, ensureFoundation, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listUsersForAdmin, localSetupStatus, markNotificationRead, replaceManagerScopes, requestApproval, setUserActive, setUserProfile, transitionTicket } from "./db";
+import { authenticateLocalUser, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listUsersForAdmin, localSetupStatus, markNotificationRead, replaceManagerScopes, requestApproval, setUserActive, setUserProfile, transitionTicket } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { COOKIE_NAME } from "@shared/const";
@@ -53,7 +53,7 @@ export const appRouter = router({
     }),
     bootstrap: protectedProcedure.query(async ({ ctx }) => {
       const user = await ensureFirstAdmin(ctx.user);
-      const foundation = await ensureFoundation();
+      const foundation = await getFoundationSummary();
       return { user, foundation };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -66,6 +66,8 @@ export const appRouter = router({
     departments: protectedProcedure.query(() => listDepartments()),
     teams: protectedProcedure.input(z.object({ departmentId: z.number().int().positive().optional() }).optional()).query(({ ctx, input }) => listTeamsForAdmin(ctx.user, input?.departmentId)),
     createTeam: protectedProcedure.input(z.object({ name: z.string().trim().min(2).max(120), departmentId: z.number().int().positive() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return createTeam(ctx.user, input); }),
+    queues: protectedProcedure.query(({ ctx }) => listQueuesForAdmin(ctx.user)),
+    createQueue: protectedProcedure.input(z.object({ name: z.string().trim().min(2).max(120), teamId: z.number().int().positive() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return createQueue(ctx.user, input); }),
     ticketTypes: protectedProcedure.query(() => listTicketTypes()),
     categories: protectedProcedure.query(() => listServiceCategories()),
     services: protectedProcedure.input(z.object({ categoryId: z.number().int().positive().optional() }).optional()).query(({ input }) => listServices(input?.categoryId)),

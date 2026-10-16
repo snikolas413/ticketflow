@@ -6,7 +6,7 @@ Plataforma configurável de gestão de tickets e workflows, em português brasil
 
 A primeira vertical slice implementa login local, shell operacional, organização inicial com setores/departamentos, equipes/filas, catálogo de tipos de chamado, categorias e serviços hierárquicos, persistência relacional de tickets, comentários públicos, notas internas para administradores, histórico, transições básicas de status, anexos duráveis e assistência de IA revisável no detalhe do ticket.
 
-Os dados de tickets são persistidos no banco gerenciado via Drizzle. A configuração inicial de Operações, Atendimento geral, Fila principal e tipos Incidente/Requisição/Problema é criada apenas quando ainda não existe uma configuração. Administradores podem criar setores e tipos pela interface; o servidor resolve a equipe/fila da abertura.
+Os dados de tickets são persistidos no banco gerenciado via Drizzle. Setores, equipes, filas e tipos de chamado começam vazios e são cadastrados manualmente por um administrador. A aplicação não cria dados de catálogo automaticamente; antes de abrir chamados, configure essas opções na área administrativa.
 
 ## Execução local do projeto
 

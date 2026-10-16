@@ -268,6 +268,13 @@ export async function listTeamsForAdmin(admin: User, departmentId?: number) {
   return db.select().from(teams).where(departmentId ? and(eq(teams.departmentId, departmentId), eq(teams.active, 1)) : eq(teams.active, 1)).orderBy(asc(teams.name));
 }
 
+export async function listQueuesForAdmin(admin: User) {
+  if (admin.role !== "admin") throw new Error("Only administrators can list queues");
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  return db.select().from(queues).where(eq(queues.active, 1)).orderBy(asc(queues.name));
+}
+
 export async function listManagerScopes(admin: User, userId: number) {
   if (admin.role !== "admin") throw new Error("Only administrators can list manager scopes");
   const db = await getDb();
@@ -314,51 +321,16 @@ export async function markNotificationRead(user: User, notificationId: number) {
   await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.id, notificationId), eq(notifications.userId, user.id)));
 }
 
-export async function ensureFoundation() {
+export async function getFoundationSummary() {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
 
-  let department = (await db.select().from(departments).orderBy(asc(departments.id)).limit(1))[0];
-  if (!department) {
-    await db.insert(departments).values({ name: "Operações", code: "operations", active: 1 });
-    department = (await db.select().from(departments).orderBy(asc(departments.id)).limit(1))[0];
-  }
-  if (!department) throw new Error("Could not initialize department");
-
-  let team = (await db.select().from(teams).where(eq(teams.departmentId, department.id)).orderBy(asc(teams.id)).limit(1))[0];
-  if (!team) {
-    await db.insert(teams).values({ departmentId: department.id, name: "Atendimento geral", active: 1 });
-    team = (await db.select().from(teams).where(eq(teams.departmentId, department.id)).orderBy(asc(teams.id)).limit(1))[0];
-  }
-  if (!team) throw new Error("Could not initialize team");
-
-  let queue = (await db.select().from(queues).where(eq(queues.teamId, team.id)).orderBy(asc(queues.id)).limit(1))[0];
-  if (!queue) {
-    await db.insert(queues).values({ departmentId: department.id, teamId: team.id, name: "Fila principal", active: 1 });
-    queue = (await db.select().from(queues).where(eq(queues.teamId, team.id)).orderBy(asc(queues.id)).limit(1))[0];
-  }
-  if (!queue) throw new Error("Could not initialize queue");
-
-  let ticketType = (await db.select().from(ticketTypes).orderBy(asc(ticketTypes.id)).limit(1))[0];
-  if (!ticketType) {
-    await db.insert(ticketTypes).values({ name: "Solicitação geral", description: "Tipo inicial configurável", defaultQueueId: queue.id, active: 1 });
-    ticketType = (await db.select().from(ticketTypes).orderBy(asc(ticketTypes.id)).limit(1))[0];
-  }
-  if (!ticketType) throw new Error("Could not initialize ticket type");
-
-  const existingTypes = await db.select().from(ticketTypes).where(eq(ticketTypes.active, 1)).orderBy(asc(ticketTypes.id));
-  const starterTypes = [
-    { name: "Incidente", description: "Interrupção ou degradação de um serviço" },
-    { name: "Requisição", description: "Solicitação de acesso, informação ou serviço" },
-    { name: "Problema", description: "Investigação de causa recorrente ou estrutural" },
-  ];
-  for (const starterType of starterTypes) {
-    if (!existingTypes.some(type => type.name === starterType.name)) {
-      await db.insert(ticketTypes).values({ ...starterType, defaultQueueId: queue.id, active: 1 });
-    }
-  }
-
-  return { department, team, queue, ticketType };
+  const [department] = await db.select({ name: departments.name }).from(departments).where(eq(departments.active, 1)).orderBy(asc(departments.name)).limit(1);
+  const [queue] = await db.select({ name: queues.name }).from(queues).where(eq(queues.active, 1)).orderBy(asc(queues.name)).limit(1);
+  return {
+    department: department ?? { name: "Nenhum setor configurado" },
+    queue: queue ?? { name: "Nenhuma fila configurada" },
+  };
 }
 
 export async function listDepartments() {
@@ -405,11 +377,20 @@ export async function createTeam(admin: User, input: { name: string; departmentI
   return db.select().from(teams).where(and(eq(teams.departmentId, input.departmentId), eq(teams.name, input.name.trim()))).orderBy(desc(teams.id)).limit(1).then(rows => rows[0]);
 }
 
+export async function createQueue(admin: User, input: { name: string; teamId: number }) {
+  if (admin.role !== "admin") throw new Error("Only administrators can create queues");
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const team = (await db.select().from(teams).where(and(eq(teams.id, input.teamId), eq(teams.active, 1))).limit(1))[0];
+  if (!team) throw new Error("Equipe não encontrada ou inativa");
+  const [queue] = await db.insert(queues).values({ name: input.name.trim(), departmentId: team.departmentId, teamId: team.id, active: 1 }).returning({ id: queues.id });
+  return (await db.select().from(queues).where(eq(queues.id, queue.id)).limit(1))[0];
+}
+
 export async function createTicketType(input: { name: string; description?: string; defaultQueueId?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  const foundation = await ensureFoundation();
-  await db.insert(ticketTypes).values({ name: input.name.trim(), description: input.description?.trim() || null, defaultQueueId: input.defaultQueueId ?? foundation.queue.id, active: 1 });
+  await db.insert(ticketTypes).values({ name: input.name.trim(), description: input.description?.trim() || null, defaultQueueId: input.defaultQueueId ?? null, active: 1 });
   return (await listTicketTypes()).find(item => item.name === input.name.trim());
 }
 
@@ -634,8 +615,8 @@ export async function createTicket(input: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  const foundation = await ensureFoundation();
-  const departmentId = input.departmentId ?? foundation.department.id;
+  const departmentId = input.departmentId;
+  if (!departmentId) throw new Error("Cadastre e selecione um setor antes de abrir chamados");
   const selectedDepartment = (await db.select().from(departments).where(and(eq(departments.id, departmentId), eq(departments.active, 1))).limit(1))[0];
   if (!selectedDepartment) throw new Error("Setor não encontrado ou inativo");
   const selectedTeam = input.teamId
@@ -649,9 +630,10 @@ export async function createTicket(input: {
   if (!selectedQueue || selectedQueue.teamId !== teamId || selectedQueue.departmentId !== departmentId || !selectedQueue.active) throw new Error("A equipe precisa ter uma fila ativa responsável");
   const queueId = selectedQueue.id;
   const selectedType = input.ticketTypeId
-    ? (await db.select().from(ticketTypes).where(eq(ticketTypes.id, input.ticketTypeId)).limit(1))[0]
-    : foundation.ticketType;
-  const ticketTypeId = selectedType?.id ?? foundation.ticketType.id;
+    ? (await db.select().from(ticketTypes).where(and(eq(ticketTypes.id, input.ticketTypeId), eq(ticketTypes.active, 1))).limit(1))[0]
+    : undefined;
+  if (!selectedType) throw new Error("Cadastre e selecione um tipo de chamado antes de abrir chamados");
+  const ticketTypeId = selectedType.id;
   const selectedCategory = input.categoryId
     ? (await db.select().from(serviceCategories).where(and(eq(serviceCategories.id, input.categoryId), eq(serviceCategories.active, 1))).limit(1))[0]
     : undefined;

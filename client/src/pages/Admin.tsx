@@ -33,6 +33,8 @@ export default function Admin() {
   const [sectorCode, setSectorCode] = useState("");
   const [teamName, setTeamName] = useState("");
   const [teamDepartmentId, setTeamDepartmentId] = useState<number>();
+  const [queueName, setQueueName] = useState("");
+  const [queueTeamId, setQueueTeamId] = useState<number>();
   const [typeName, setTypeName] = useState("");
   const [typeDescription, setTypeDescription] = useState("");
   const [categoryName, setCategoryName] = useState("");
@@ -54,6 +56,7 @@ export default function Admin() {
   const enabled = currentUser?.role === "admin";
   const departments = trpc.catalog.departments.useQuery(undefined, { enabled });
   const teams = trpc.catalog.teams.useQuery(undefined, { enabled });
+  const queues = trpc.catalog.queues.useQuery(undefined, { enabled });
   const ticketTypes = trpc.catalog.ticketTypes.useQuery(undefined, { enabled });
   const categories = trpc.catalog.categories.useQuery(undefined, { enabled });
   const services = trpc.catalog.services.useQuery(undefined, { enabled });
@@ -64,6 +67,7 @@ export default function Admin() {
 
   const createDepartment = trpc.catalog.createDepartment.useMutation({ onSuccess: () => { toast.success("Setor criado"); setSectorName(""); setSectorCode(""); void departments.refetch(); }, onError: error => toast.error(error.message) });
   const createTeam = trpc.catalog.createTeam.useMutation({ onSuccess: () => { toast.success("Equipe criada no setor"); setTeamName(""); setTeamDepartmentId(undefined); void teams.refetch(); }, onError: error => toast.error(error.message) });
+  const createQueue = trpc.catalog.createQueue.useMutation({ onSuccess: () => { toast.success("Fila criada na equipe"); setQueueName(""); setQueueTeamId(undefined); void queues.refetch(); }, onError: error => toast.error(error.message) });
   const createTicketType = trpc.catalog.createTicketType.useMutation({ onSuccess: () => { toast.success("Tipo de chamado criado"); setTypeName(""); setTypeDescription(""); void ticketTypes.refetch(); }, onError: error => toast.error(error.message) });
   const createCategory = trpc.catalog.createCategory.useMutation({ onSuccess: () => { toast.success("Categoria criada"); setCategoryName(""); setCategoryCode(""); setCategoryParentId(undefined); void categories.refetch(); }, onError: error => toast.error(error.message) });
   const createService = trpc.catalog.createService.useMutation({ onSuccess: () => { toast.success("Serviço criado"); setServiceName(""); setServiceCode(""); setServiceCategoryId(undefined); void services.refetch(); }, onError: error => toast.error(error.message) });
@@ -169,6 +173,7 @@ export default function Admin() {
             </CardContent>
           </Card>
         </TabsContent>
+        {activeTab === "structure" && <Card className="mt-6 border-[#e5e8f0] shadow-none"><CardHeader><SectionIntro icon={Layers3} eyebrow="Passo 1 · Roteamento" title="Filas de atendimento" description="Crie as filas de cada equipe para definir o destino dos chamados." /></CardHeader><CardContent><div className="grid gap-3 rounded-2xl border border-[#edf0f5] bg-[#fbfcfe] p-4 sm:grid-cols-[1fr_1fr_auto]"><Input value={queueName} onChange={event => setQueueName(event.target.value)} placeholder="Nome da fila" /><select aria-label="Equipe da fila" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={queueTeamId ?? ""} onChange={event => setQueueTeamId(event.target.value ? Number(event.target.value) : undefined)}><option value="">Selecione uma equipe</option>{(teams.data ?? []).map(team => <option key={team.id} value={team.id}>{team.name} · {departments.data?.find(department => department.id === team.departmentId)?.name ?? "Setor"}</option>)}</select><Button disabled={createQueue.isPending || queueName.trim().length < 2 || !queueTeamId} onClick={() => createQueue.mutate({ name: queueName, teamId: queueTeamId! })}>{createQueue.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Plus className="mr-2 size-4" />}Criar fila</Button></div><div className="mt-4 space-y-2">{queues.isLoading ? <Loader2 className="size-5 animate-spin text-[#3157d5]" /> : (queues.data ?? []).length === 0 ? <EmptyState>Nenhuma fila cadastrada ainda.</EmptyState> : (queues.data ?? []).map(queue => <div key={queue.id} className="flex items-center justify-between rounded-xl border border-[#edf0f5] bg-white px-3 py-3"><div><p className="text-sm font-medium text-[#253252]">{queue.name}</p><p className="mt-1 text-xs text-[#8791a5]">{teams.data?.find(team => team.id === queue.teamId)?.name ?? "Equipe"} · {departments.data?.find(department => department.id === queue.departmentId)?.name ?? "Setor"}</p></div><Badge variant="outline" className="border-[#b9e7d2] text-[10px] text-[#147b55]">Ativa</Badge></div>)}</div></CardContent></Card>}
       </Tabs>
     </div>
   </AppShell>;
