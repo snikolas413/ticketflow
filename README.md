@@ -28,7 +28,7 @@ pnpm db:push     # gera e aplica uma migration após alteração intencional do 
 
 ## Publicação no Render com Supabase
 
-O blueprint `render.yaml` cria o serviço web a partir do Dockerfile. Crie um projeto PostgreSQL no Supabase e configure `DATABASE_URL` no Render com a URL do **Session pooler** do Supabase; não use a senha diretamente no repositório. Antes do primeiro uso, aplique o schema PostgreSQL novo a partir da raiz do projeto:
+O blueprint `render.yaml` cria o serviço web a partir do Dockerfile. Crie um projeto PostgreSQL no Supabase e configure `DATABASE_URL` no Render com a URL do **Session pooler** do Supabase; não use a senha diretamente no repositório. O container aplica as migrations PostgreSQL no início de cada deploy antes de iniciar o servidor. Para aplicar manualmente a partir da raiz do projeto:
 
 ```powershell
 $env:DATABASE_URL = "<URL do Session pooler do Supabase>"
