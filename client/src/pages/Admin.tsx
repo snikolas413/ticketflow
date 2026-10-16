@@ -69,6 +69,7 @@ export default function Admin() {
   const createService = trpc.catalog.createService.useMutation({ onSuccess: () => { toast.success("Serviço criado"); setServiceName(""); setServiceCode(""); setServiceCategoryId(undefined); void services.refetch(); }, onError: error => toast.error(error.message) });
   const createUser = trpc.admin.createUser.useMutation({ onSuccess: () => { toast.success("Usuário criado e pronto para login"); setUserEmail(""); setUserPassword(""); setUserDepartmentId(undefined); setUserTeamId(undefined); void users.refetch(); }, onError: error => toast.error(error.message) });
   const setProfile = trpc.admin.setProfile.useMutation({ onSuccess: () => { toast.success("Perfil atualizado"); void users.refetch(); }, onError: error => toast.error(error.message) });
+  const setUserActive = trpc.admin.setActive.useMutation({ onSuccess: () => { toast.success("Acesso atualizado"); void users.refetch(); }, onError: error => toast.error(error.message) });
   const setManagerScopes = trpc.admin.setManagerScopes.useMutation({ onSuccess: () => { toast.success("Escopo do gestor atualizado"); void managerScopes.refetch(); }, onError: error => toast.error(error.message) });
   const downloadAttachment = trpc.tickets.downloadAttachment.useMutation({ onSuccess: result => window.open(result.url, "_blank", "noopener,noreferrer"), onError: error => toast.error(error.message) });
 
@@ -98,6 +99,76 @@ export default function Admin() {
 
 
         <TabsContent value="operations" className="mt-6 space-y-6"><Card className="border-[#e5e8f0] shadow-none"><CardHeader><SectionIntro icon={FolderCog} eyebrow="Controle e rastreabilidade" title="Arquivos e auditoria" description="Acompanhe anexos persistidos e eventos de segurança sem misturar essas tarefas com os cadastros do dia a dia." tone="purple" /></CardHeader><CardContent><div className="grid gap-6 lg:grid-cols-2"><div><h3 className="text-sm font-semibold text-[#253252]">Arquivos dos chamados</h3><p className="mt-1 text-xs text-[#8791a5]">Índice operacional dos anexos armazenados.</p><div className="mt-4 space-y-2">{attachments.isLoading ? <Loader2 className="size-5 animate-spin text-[#3157d5]" /> : (attachments.data ?? []).length === 0 ? <EmptyState>Nenhum anexo cadastrado.</EmptyState> : (attachments.data ?? []).map(file => <div key={file.id} className="flex items-center gap-3 rounded-xl border border-[#edf0f5] bg-white p-3"><FileText className="size-4 shrink-0 text-[#3157d5]" /><span className="min-w-0 flex-1 truncate text-xs text-[#526079]">{file.fileName}</span><span className="text-[10px] text-[#8791a5]">#{file.ticketId}</span><Button variant="ghost" size="sm" onClick={() => downloadAttachment.mutate({ attachmentId: file.id })}><Download className="mr-1.5 size-3.5" /> Baixar</Button></div>)}</div></div><div><h3 className="text-sm font-semibold text-[#253252]">Auditoria operacional</h3><p className="mt-1 text-xs text-[#8791a5]">Acessos negados, transições inválidas e eventos de segurança.</p><div className="mt-4 divide-y divide-[#edf0f5] rounded-xl border border-[#edf0f5] bg-white px-3">{audit.isLoading ? <Loader2 className="my-5 size-5 animate-spin text-[#3157d5]" /> : (audit.data ?? []).length === 0 ? <p className="py-6 text-center text-xs text-[#8791a5]">Nenhum evento registrado.</p> : (audit.data ?? []).slice(0, 12).map(item => <div key={item.id} className="flex flex-col gap-1 py-3"><p className="text-xs font-semibold text-[#253252]">{item.action}</p><p className="mono text-[10px] text-[#8791a5]">{item.resource}{item.ticketId ? ` · ticket #${item.ticketId}` : ""} · {new Date(item.createdAt).toLocaleString("pt-BR")}</p></div>)}</div></div></div></CardContent></Card></TabsContent>
+        <TabsContent value="people" className="mt-6 space-y-6">
+          <Card className="border-[#e5e8f0] shadow-none">
+            <CardHeader>
+              <SectionIntro icon={Users} eyebrow="Pessoas e acessos" title="Criar usuário" description="Cadastre uma conta local e defina o perfil e a área de atendimento. A senha é armazenada como hash no servidor." tone="green" />
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 rounded-2xl border border-[#edf0f5] bg-[#fbfcfe] p-4 md:grid-cols-2">
+                <label className="space-y-1.5 text-xs font-medium text-[#526079]">E-mail corporativo
+                  <Input type="email" autoComplete="email" value={userEmail} onChange={event => setUserEmail(event.target.value)} placeholder="nome@empresa.com.br" />
+                </label>
+                <label className="space-y-1.5 text-xs font-medium text-[#526079]">Senha inicial
+                  <Input type="password" autoComplete="new-password" value={userPassword} onChange={event => setUserPassword(event.target.value)} placeholder="Mínimo de 8 caracteres" />
+                </label>
+                <label className="space-y-1.5 text-xs font-medium text-[#526079]">Perfil
+                  <select className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={userProfile} onChange={event => setUserProfile(event.target.value as Profile)}>
+                    {Object.entries(profileLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </label>
+                {userProfile !== "requester" && <>
+                  <label className="space-y-1.5 text-xs font-medium text-[#526079]">Setor
+                    <select className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={userDepartmentId ?? ""} onChange={event => { setUserDepartmentId(event.target.value ? Number(event.target.value) : undefined); setUserTeamId(undefined); }}>
+                      <option value="">Selecione um setor</option>
+                      {(departments.data ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="space-y-1.5 text-xs font-medium text-[#526079]">Equipe (opcional)
+                    <select className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={userTeamId ?? ""} disabled={!userDepartmentId} onChange={event => setUserTeamId(event.target.value ? Number(event.target.value) : undefined)}>
+                      <option value="">Todas as equipes do setor</option>
+                      {(teams.data ?? []).filter(team => team.departmentId === userDepartmentId).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+                    </select>
+                  </label>
+                </>}
+                {userProfile !== "requester" && <p className="text-xs leading-5 text-[#8791a5] md:col-span-2">Atendentes, aprovadores e gestores precisam estar vinculados a um setor.</p>}
+                <div className="md:col-span-2">
+                  <Button className="w-full sm:w-auto" disabled={createUser.isPending || !userEmail.includes("@") || userPassword.length < 8 || (userProfile !== "requester" && !userDepartmentId)} onClick={() => createUser.mutate({ email: userEmail, password: userPassword, profile: userProfile, departmentId: userDepartmentId, teamId: userTeamId })}>
+                    {createUser.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <UserPlus className="mr-2 size-4" />}
+                    Criar usuário
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#e5e8f0] shadow-none">
+            <CardHeader>
+              <CardTitle className="text-base text-[#253252]">Usuários cadastrados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {users.isLoading ? <Loader2 className="my-5 size-5 animate-spin text-[#3157d5]" /> : users.isError ? <EmptyState>Não foi possível carregar os usuários. Atualize a lista para tentar novamente.</EmptyState> : (users.data ?? []).length === 0 ? <EmptyState>Nenhum usuário cadastrado.</EmptyState> : <div className="divide-y divide-[#edf0f5] rounded-xl border border-[#edf0f5] bg-white px-3">
+                {(users.data ?? []).map(account => <div key={account.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[#253252]">{account.name || account.email}</p>
+                    <p className="mt-1 truncate text-xs text-[#8791a5]">{account.email}</p>
+                    <p className="mt-1 text-[11px] text-[#8791a5]">{departments.data?.find(department => department.id === account.departmentId)?.name ?? "Sem setor"}{account.teamId ? ` · ${teams.data?.find(team => team.id === account.teamId)?.name ?? "Equipe"}` : ""}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {account.role === "admin" && <Badge variant="outline">Administrador</Badge>}
+                    <select aria-label={`Perfil de ${account.email ?? account.id}`} className="h-9 rounded-md border border-input bg-background px-2 text-xs" value={account.profile} onChange={event => setProfile.mutate({ userId: account.id, profile: event.target.value as Profile })} disabled={setProfile.isPending}>
+                      {Object.entries(profileLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                    <Button variant="outline" size="sm" disabled={setUserActive.isPending || account.id === currentUser?.id} onClick={() => setUserActive.mutate({ userId: account.id, active: account.active !== 1 })}>
+                      {account.active === 1 ? "Desativar" : "Ativar"}
+                    </Button>
+                    <Badge variant="outline" className={account.active === 1 ? "border-[#b9e7d2] text-[#147b55]" : "border-[#e5e8f0] text-[#8791a5]"}>{account.active === 1 ? "Ativo" : "Inativo"}</Badge>
+                  </div>
+                </div>)}
+              </div>}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   </AppShell>;
