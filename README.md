@@ -35,7 +35,7 @@ $env:DATABASE_URL = "<URL do Session pooler do Supabase>"
 pnpm db:migrate
 ```
 
-As migrations PostgreSQL ficam em `drizzle-supabase/`; as migrations antigas em `drizzle/` continuam sendo o histórico MySQL e não devem ser aplicadas ao Supabase. O blueprint gera `MANUS_JWT_SECRET` e define `MANUS_PROJECT_ID` para assinar sessões locais. Para habilitar anexos e assistência de IA, configure também `MANUS_API_URL` e `MANUS_API_KEY` como secrets no Render; sem essas variáveis, o servidor sobe, mas essas integrações não funcionam.
+As migrations PostgreSQL ficam em `drizzle-supabase/`; as migrations antigas em `drizzle/` continuam sendo o histórico MySQL e não devem ser aplicadas ao Supabase. O blueprint gera `MANUS_JWT_SECRET` e define `MANUS_PROJECT_ID` para assinar sessões locais. A conexão usa TLS; sem `DATABASE_SSL_CA`, o modo `sslmode=require` criptografa o tráfego, mas não valida o certificado do servidor. Para validar a cadeia, configure `DATABASE_SSL_CA` com o certificado raiz baixado em **Database Settings** no Supabase. Para habilitar anexos e assistência de IA, configure também `MANUS_API_URL` e `MANUS_API_KEY` como secrets no Render; sem essas variáveis, o servidor sobe, mas essas integrações não funcionam.
 
 ## Variáveis de ambiente
 

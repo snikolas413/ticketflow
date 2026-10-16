@@ -49,7 +49,12 @@ export async function verifyPassword(password: string, encoded: string) {
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(new Pool({ connectionString: process.env.DATABASE_URL }));
+      const connectionUrl = new URL(process.env.DATABASE_URL);
+      const sslMode = connectionUrl.searchParams.get("sslmode");
+      connectionUrl.searchParams.delete("sslmode");
+      const sslCa = process.env.DATABASE_SSL_CA;
+      const ssl = sslCa ? { ca: sslCa } : sslMode === "require" ? { rejectUnauthorized: false } : undefined;
+      _db = drizzle(new Pool({ connectionString: connectionUrl.toString(), ssl }));
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
