@@ -106,7 +106,12 @@ export const appRouter = router({
     decide: protectedProcedure.input(z.object({ approvalId: z.number().int().positive(), status: z.enum(["approved", "rejected"]), note: z.string().trim().max(2000).optional() })).mutation(({ ctx, input }) => decideApproval({ user: ctx.user, ...input })),
   }),
   tickets: router({
-    list: protectedProcedure.input(z.object({ search: z.string().trim().max(80).optional(), status: z.enum(TICKET_STATUSES).optional(), priority: z.enum(PRIORITIES).optional() }).optional()).query(({ ctx, input }) => listTickets(ctx.user, input ?? {})),
+    list: protectedProcedure.input(z.object({
+      search: z.string().trim().max(80).optional(),
+      status: z.enum(TICKET_STATUSES).optional(),
+      priority: z.enum(PRIORITIES).optional(),
+      assignedToMe: z.boolean().optional(),
+    }).optional()).query(({ ctx, input }) => listTickets(ctx.user, input ?? {})),
     create: protectedProcedure.input(ticketInput).mutation(({ ctx, input }) => createTicket({ user: ctx.user, ...input })),
     detail: protectedProcedure.input(z.object({ ticketId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const ticket = await getTicketOrThrow(ctx.user, input.ticketId);

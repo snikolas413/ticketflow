@@ -428,6 +428,7 @@ export type TicketFilters = {
   search?: string;
   status?: TicketStatus;
   priority?: TicketPriority;
+  assignedToMe?: boolean;
 };
 
 function userAreaPredicate(table: typeof users, departmentId: number, teamId: number) {
@@ -460,6 +461,9 @@ export async function listTickets(user: User, filters: TicketFilters = {}) {
   else if (access) clauses.push(access);
   else if (approvalAccess.length) clauses.push(or(...approvalAccess)!);
   if (user.role !== "admin" && user.profile === "agent") clauses.push(or(eq(tickets.requesterId, user.id), eq(tickets.assigneeId, user.id), eq(tickets.approvalStatus, "approved"))!);
+  if (filters.assignedToMe) {
+    clauses.push(eq(tickets.assigneeId, user.id));
+  }
   if (filters.status) clauses.push(eq(tickets.status, filters.status));
   if (filters.priority) clauses.push(eq(tickets.priority, filters.priority));
   if (filters.search) {

@@ -3,13 +3,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
-import { Bell, ClipboardList, LayoutDashboard, LogOut, Menu, Settings2, Sparkles, X } from "lucide-react";
+import { Bell, ClipboardList, Inbox, LayoutDashboard, LogOut, Menu, Settings2, X } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 
 const navItems = [
   { label: "Visão geral", icon: LayoutDashboard, path: "/" },
-  { label: "Meus chamados", icon: ClipboardList, path: "/" },
+  { label: "Meus chamados", icon: ClipboardList, path: "/my-tickets" },
+  { label: "Fila geral", icon: Inbox, path: "/tickets" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -43,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="mt-12 px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Workspace</div>
         <nav className="mt-3 space-y-1">
           {navItems.map(item => {
-            const active = item.path === "/" && !activeDetail;
+            const active = location === item.path && !activeDetail;
             return (
               <button key={item.label} onClick={() => { setLocation(item.path); setMobileOpen(false); }} className={cn("sidebar-link", active && "sidebar-link-active")}>
                 <item.icon className="size-[17px]" />
@@ -51,11 +52,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             );
           })}
-          <button className="sidebar-link" onClick={() => setLocation("/")}>
-            <Sparkles className="size-[17px]" />
-            <span>Assistência de IA</span>
-            <span className="ml-auto rounded bg-white/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[#a9baff]">beta</span>
-          </button>
         </nav>
 
         <div className="mt-10 px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Configuração</div>

@@ -1,4 +1,9 @@
 import "dotenv/config";
+
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = import.meta.url.endsWith(".ts") ? "development" : "production";
+}
+
 import express from "express";
 import { createServer } from "http";
 import { sql } from "drizzle-orm";
