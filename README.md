@@ -26,6 +26,17 @@ pnpm db:migrate  # aplica migrations já geradas
 pnpm db:push     # gera e aplica uma migration após alteração intencional do schema
 ```
 
+## Publicação no Render com Supabase
+
+O blueprint `render.yaml` cria o serviço web a partir do Dockerfile. Crie um projeto PostgreSQL no Supabase e configure `DATABASE_URL` no Render com a URL do **Session pooler** do Supabase; não use a senha diretamente no repositório. Antes do primeiro uso, aplique o schema PostgreSQL novo a partir da raiz do projeto:
+
+```powershell
+$env:DATABASE_URL = "<URL do Session pooler do Supabase>"
+pnpm db:migrate
+```
+
+As migrations PostgreSQL ficam em `drizzle-supabase/`; as migrations antigas em `drizzle/` continuam sendo o histórico MySQL e não devem ser aplicadas ao Supabase. O blueprint gera `MANUS_JWT_SECRET` e define `MANUS_PROJECT_ID` para assinar sessões locais. Para habilitar anexos e assistência de IA, configure também `MANUS_API_URL` e `MANUS_API_KEY` como secrets no Render; sem essas variáveis, o servidor sobe, mas essas integrações não funcionam.
+
 ## Variáveis de ambiente
 
 O ambiente Webdev gerenciado fornece as variáveis de plataforma em desenvolvimento e publicação. As principais utilizadas são:

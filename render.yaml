@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: ticketflow
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: DATABASE_URL
+        sync: false
+      - key: MANUS_PROJECT_ID
+        value: ticketflow-production
+      - key: MANUS_JWT_SECRET
+        generateValue: true

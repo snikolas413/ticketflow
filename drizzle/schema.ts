@@ -1,86 +1,95 @@
 import {
-  int,
   index,
-  mysqlEnum,
-  mysqlTable,
+  integer,
+  pgEnum,
+  pgTable,
+  serial,
   text,
   timestamp,
   uniqueIndex,
   varchar,
-} from "drizzle-orm/mysql-core";
+} from "drizzle-orm/pg-core";
 
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
+export const userProfileEnum = pgEnum("user_profile", ["requester", "agent", "approver", "manager"]);
+export const ticketPriorityEnum = pgEnum("ticket_priority", ["low", "medium", "high", "urgent"]);
+export const ticketStatusEnum = pgEnum("ticket_status", ["open", "in_progress", "waiting_requester", "resolved", "closed"]);
+export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "rejected"]);
+export const commentVisibilityEnum = pgEnum("comment_visibility", ["public", "internal"]);
+export const aiAssistanceStatusEnum = pgEnum("ai_assistance_status", ["pending", "completed", "failed"]);
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   passwordHash: varchar("passwordHash", { length: 220 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  profile: mysqlEnum("profile", ["requester", "agent", "approver", "manager"]).default("requester").notNull(),
-  departmentId: int("departmentId").references(() => departments.id),
-  teamId: int("teamId").references(() => teams.id),
-  active: int("active").default(1).notNull(),
+  role: userRoleEnum("role").default("user").notNull(),
+  profile: userProfileEnum("profile").default("requester").notNull(),
+  departmentId: integer("departmentId").references(() => departments.id),
+  teamId: integer("teamId").references(() => teams.id),
+  active: integer("active").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
-export const departments = mysqlTable("departments", {
-  id: int("id").autoincrement().primaryKey(),
+export const departments = pgTable("departments", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 120 }).notNull(),
   code: varchar("code", { length: 40 }).notNull().unique(),
-  active: int("active").default(1).notNull(),
+  active: integer("active").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
-export const userInvitations = mysqlTable("userInvitations", {
-  id: int("id").autoincrement().primaryKey(),
+export const userInvitations = pgTable("userInvitations", {
+  id: serial("id").primaryKey(),
   email: varchar("email", { length: 320 }).notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 220 }),
-  profile: mysqlEnum("profile", ["requester", "agent", "approver", "manager"]).default("requester").notNull(),
-  departmentId: int("departmentId").references(() => departments.id),
-  teamId: int("teamId").references(() => teams.id),
-  invitedById: int("invitedById").notNull().references(() => users.id),
-  active: int("active").default(1).notNull(),
+  profile: userProfileEnum("profile").default("requester").notNull(),
+  departmentId: integer("departmentId").references(() => departments.id),
+  teamId: integer("teamId").references(() => teams.id),
+  invitedById: integer("invitedById").notNull().references(() => users.id),
+  active: integer("active").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export const teams = mysqlTable(
+export const teams = pgTable(
   "teams",
   {
-    id: int("id").autoincrement().primaryKey(),
-    departmentId: int("departmentId").notNull().references(() => departments.id),
+    id: serial("id").primaryKey(),
+    departmentId: integer("departmentId").notNull().references(() => departments.id),
     name: varchar("name", { length: 120 }).notNull(),
-    active: int("active").default(1).notNull(),
+    active: integer("active").default(1).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
   },
   table => [index("teams_department_idx").on(table.departmentId)],
 );
 
-export const queues = mysqlTable(
+export const queues = pgTable(
   "queues",
   {
-    id: int("id").autoincrement().primaryKey(),
-    departmentId: int("departmentId").notNull().references(() => departments.id),
-    teamId: int("teamId").notNull().references(() => teams.id),
+    id: serial("id").primaryKey(),
+    departmentId: integer("departmentId").notNull().references(() => departments.id),
+    teamId: integer("teamId").notNull().references(() => teams.id),
     name: varchar("name", { length: 120 }).notNull(),
-    active: int("active").default(1).notNull(),
+    active: integer("active").default(1).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
   },
   table => [index("queues_team_idx").on(table.teamId)],
 );
 
-export const managerScopes = mysqlTable(
+export const managerScopes = pgTable(
   "managerScopes",
   {
-    id: int("id").autoincrement().primaryKey(),
-    userId: int("userId").notNull().references(() => users.id),
-    departmentId: int("departmentId").references(() => departments.id),
-    teamId: int("teamId").references(() => teams.id),
+    id: serial("id").primaryKey(),
+    userId: integer("userId").notNull().references(() => users.id),
+    departmentId: integer("departmentId").references(() => departments.id),
+    teamId: integer("teamId").references(() => teams.id),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => [
@@ -91,106 +100,106 @@ export const managerScopes = mysqlTable(
   ],
 );
 
-export const roles = mysqlTable("roles", {
-  id: int("id").autoincrement().primaryKey(),
+export const roles = pgTable("roles", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 80 }).notNull().unique(),
   description: varchar("description", { length: 255 }),
-  isSystem: int("isSystem").default(0).notNull(),
+  isSystem: integer("isSystem").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export const permissions = mysqlTable("permissions", {
-  id: int("id").autoincrement().primaryKey(),
+export const permissions = pgTable("permissions", {
+  id: serial("id").primaryKey(),
   code: varchar("code", { length: 120 }).notNull().unique(),
   description: varchar("description", { length: 255 }),
 });
 
-export const userRoles = mysqlTable(
+export const userRoles = pgTable(
   "userRoles",
   {
-    id: int("id").autoincrement().primaryKey(),
-    userId: int("userId").notNull().references(() => users.id),
-    roleId: int("roleId").notNull().references(() => roles.id),
-    departmentId: int("departmentId").references(() => departments.id),
-    teamId: int("teamId").references(() => teams.id),
-    queueId: int("queueId").references(() => queues.id),
+    id: serial("id").primaryKey(),
+    userId: integer("userId").notNull().references(() => users.id),
+    roleId: integer("roleId").notNull().references(() => roles.id),
+    departmentId: integer("departmentId").references(() => departments.id),
+    teamId: integer("teamId").references(() => teams.id),
+    queueId: integer("queueId").references(() => queues.id),
   },
   table => [uniqueIndex("user_roles_scope_unique").on(table.userId, table.roleId, table.departmentId, table.teamId, table.queueId)],
 );
 
-export const rolePermissions = mysqlTable(
+export const rolePermissions = pgTable(
   "rolePermissions",
   {
-    id: int("id").autoincrement().primaryKey(),
-    roleId: int("roleId").notNull().references(() => roles.id),
-    permissionId: int("permissionId").notNull().references(() => permissions.id),
+    id: serial("id").primaryKey(),
+    roleId: integer("roleId").notNull().references(() => roles.id),
+    permissionId: integer("permissionId").notNull().references(() => permissions.id),
   },
   table => [uniqueIndex("role_permissions_unique").on(table.roleId, table.permissionId)],
 );
 
-export const serviceCategories = mysqlTable(
+export const serviceCategories = pgTable(
   "serviceCategories",
   {
-    id: int("id").autoincrement().primaryKey(),
-    parentId: int("parentId"),
+    id: serial("id").primaryKey(),
+    parentId: integer("parentId"),
     name: varchar("name", { length: 120 }).notNull(),
     code: varchar("code", { length: 60 }).notNull().unique(),
     description: varchar("description", { length: 255 }),
-    sortOrder: int("sortOrder").default(0).notNull(),
-    active: int("active").default(1).notNull(),
+    sortOrder: integer("sortOrder").default(0).notNull(),
+    active: integer("active").default(1).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
   },
   table => [index("service_categories_parent_idx").on(table.parentId, table.active)],
 );
 
-export const ticketTypes = mysqlTable("ticketTypes", {
-  id: int("id").autoincrement().primaryKey(),
+export const ticketTypes = pgTable("ticketTypes", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 120 }).notNull(),
   description: varchar("description", { length: 255 }),
-  defaultQueueId: int("defaultQueueId").references(() => queues.id),
-  active: int("active").default(1).notNull(),
+  defaultQueueId: integer("defaultQueueId").references(() => queues.id),
+  active: integer("active").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
-export const services = mysqlTable(
+export const services = pgTable(
   "services",
   {
-    id: int("id").autoincrement().primaryKey(),
-    categoryId: int("categoryId").notNull().references(() => serviceCategories.id),
+    id: serial("id").primaryKey(),
+    categoryId: integer("categoryId").notNull().references(() => serviceCategories.id),
     name: varchar("name", { length: 160 }).notNull(),
     code: varchar("code", { length: 60 }).notNull().unique(),
     description: varchar("description", { length: 500 }),
-    defaultTicketTypeId: int("defaultTicketTypeId").references(() => ticketTypes.id),
-    defaultQueueId: int("defaultQueueId").references(() => queues.id),
-    active: int("active").default(1).notNull(),
+    defaultTicketTypeId: integer("defaultTicketTypeId").references(() => ticketTypes.id),
+    defaultQueueId: integer("defaultQueueId").references(() => queues.id),
+    active: integer("active").default(1).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
   },
   table => [index("services_category_idx").on(table.categoryId, table.active)],
 );
 
-export const tickets = mysqlTable(
+export const tickets = pgTable(
   "tickets",
   {
-    id: int("id").autoincrement().primaryKey(),
+    id: serial("id").primaryKey(),
     publicNumber: varchar("publicNumber", { length: 32 }).notNull().unique(),
     title: varchar("title", { length: 180 }).notNull(),
     description: text("description").notNull(),
-    requesterId: int("requesterId").notNull().references(() => users.id),
-    departmentId: int("departmentId").notNull().references(() => departments.id),
-    teamId: int("teamId").notNull().references(() => teams.id),
-    queueId: int("queueId").notNull().references(() => queues.id),
-    assigneeId: int("assigneeId").references(() => users.id),
-    ticketTypeId: int("ticketTypeId").notNull().references(() => ticketTypes.id),
-    categoryId: int("categoryId").references(() => serviceCategories.id),
-    serviceId: int("serviceId").references(() => services.id),
-    priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
-    status: mysqlEnum("status", ["open", "in_progress", "waiting_requester", "resolved", "closed"]).default("open").notNull(),
-    approvalStatus: mysqlEnum("approvalStatus", ["pending", "approved", "rejected"]).default("pending").notNull(),
+    requesterId: integer("requesterId").notNull().references(() => users.id),
+    departmentId: integer("departmentId").notNull().references(() => departments.id),
+    teamId: integer("teamId").notNull().references(() => teams.id),
+    queueId: integer("queueId").notNull().references(() => queues.id),
+    assigneeId: integer("assigneeId").references(() => users.id),
+    ticketTypeId: integer("ticketTypeId").notNull().references(() => ticketTypes.id),
+    categoryId: integer("categoryId").references(() => serviceCategories.id),
+    serviceId: integer("serviceId").references(() => services.id),
+    priority: ticketPriorityEnum("priority").default("medium").notNull(),
+    status: ticketStatusEnum("status").default("open").notNull(),
+    approvalStatus: approvalStatusEnum("approvalStatus").default("pending").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
     resolvedAt: timestamp("resolvedAt"),
     closedAt: timestamp("closedAt"),
   },
@@ -203,16 +212,16 @@ export const tickets = mysqlTable(
   ],
 );
 
-export const ticketAttachments = mysqlTable(
+export const ticketAttachments = pgTable(
   "ticketAttachments",
   {
-    id: int("id").autoincrement().primaryKey(),
-    ticketId: int("ticketId").notNull().references(() => tickets.id),
-    commentId: int("commentId"),
-    uploadedById: int("uploadedById").notNull().references(() => users.id),
+    id: serial("id").primaryKey(),
+    ticketId: integer("ticketId").notNull().references(() => tickets.id),
+    commentId: integer("commentId"),
+    uploadedById: integer("uploadedById").notNull().references(() => users.id),
     fileName: varchar("fileName", { length: 255 }).notNull(),
     contentType: varchar("contentType", { length: 120 }).notNull(),
-    fileSize: int("fileSize").notNull(),
+    fileSize: integer("fileSize").notNull(),
     storageKey: varchar("storageKey", { length: 500 }).notNull().unique(),
     storageUrl: varchar("storageUrl", { length: 600 }).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -220,14 +229,14 @@ export const ticketAttachments = mysqlTable(
   table => [index("ticket_attachments_ticket_idx").on(table.ticketId, table.createdAt)],
 );
 
-export const ticketApprovals = mysqlTable(
+export const ticketApprovals = pgTable(
   "ticketApprovals",
   {
-    id: int("id").autoincrement().primaryKey(),
-    ticketId: int("ticketId").notNull().references(() => tickets.id),
-    approverId: int("approverId").notNull().references(() => users.id),
-    requestedById: int("requestedById").notNull().references(() => users.id),
-    status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+    id: serial("id").primaryKey(),
+    ticketId: integer("ticketId").notNull().references(() => tickets.id),
+    approverId: integer("approverId").notNull().references(() => users.id),
+    requestedById: integer("requestedById").notNull().references(() => users.id),
+    status: approvalStatusEnum("status").default("pending").notNull(),
     requestNote: text("requestNote"),
     decisionNote: text("decisionNote"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -236,26 +245,26 @@ export const ticketApprovals = mysqlTable(
   table => [index("ticket_approvals_approver_idx").on(table.approverId, table.status), index("ticket_approvals_ticket_idx").on(table.ticketId, table.createdAt)],
 );
 
-export const ticketComments = mysqlTable(
+export const ticketComments = pgTable(
   "ticketComments",
   {
-    id: int("id").autoincrement().primaryKey(),
-    ticketId: int("ticketId").notNull().references(() => tickets.id),
-    authorId: int("authorId").notNull().references(() => users.id),
-    visibility: mysqlEnum("visibility", ["public", "internal"]).default("public").notNull(),
+    id: serial("id").primaryKey(),
+    ticketId: integer("ticketId").notNull().references(() => tickets.id),
+    authorId: integer("authorId").notNull().references(() => users.id),
+    visibility: commentVisibilityEnum("visibility").default("public").notNull(),
     body: text("body").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
   },
   table => [index("ticket_comments_ticket_idx").on(table.ticketId, table.createdAt)],
 );
 
-export const ticketEvents = mysqlTable(
+export const ticketEvents = pgTable(
   "ticketEvents",
   {
-    id: int("id").autoincrement().primaryKey(),
-    ticketId: int("ticketId").notNull().references(() => tickets.id),
-    actorId: int("actorId").references(() => users.id),
+    id: serial("id").primaryKey(),
+    ticketId: integer("ticketId").notNull().references(() => tickets.id),
+    actorId: integer("actorId").references(() => users.id),
     eventType: varchar("eventType", { length: 80 }).notNull(),
     payload: text("payload").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -263,12 +272,12 @@ export const ticketEvents = mysqlTable(
   table => [index("ticket_events_ticket_idx").on(table.ticketId, table.createdAt)],
 );
 
-export const auditLogs = mysqlTable(
+export const auditLogs = pgTable(
   "auditLogs",
   {
-    id: int("id").autoincrement().primaryKey(),
-    actorId: int("actorId").references(() => users.id),
-    ticketId: int("ticketId").references(() => tickets.id),
+    id: serial("id").primaryKey(),
+    actorId: integer("actorId").references(() => users.id),
+    ticketId: integer("ticketId").references(() => tickets.id),
     action: varchar("action", { length: 100 }).notNull(),
     resource: varchar("resource", { length: 100 }).notNull(),
     payload: text("payload").notNull(),
@@ -277,11 +286,11 @@ export const auditLogs = mysqlTable(
   table => [index("audit_logs_ticket_idx").on(table.ticketId, table.createdAt), index("audit_logs_actor_idx").on(table.actorId, table.createdAt)],
 );
 
-export const notifications = mysqlTable("notifications", {
-    id: int("id").autoincrement().primaryKey(),
-    userId: int("userId").notNull().references(() => users.id),
-    ticketId: int("ticketId").references(() => tickets.id),
-    approvalId: int("approvalId").references(() => ticketApprovals.id),
+export const notifications = pgTable("notifications", {
+    id: serial("id").primaryKey(),
+    userId: integer("userId").notNull().references(() => users.id),
+    ticketId: integer("ticketId").references(() => tickets.id),
+    approvalId: integer("approvalId").references(() => ticketApprovals.id),
     type: varchar("type", { length: 60 }).notNull(),
     title: varchar("title", { length: 180 }).notNull(),
     body: text("body").notNull(),
@@ -291,14 +300,14 @@ export const notifications = mysqlTable("notifications", {
   table => [index("notifications_user_idx").on(table.userId, table.readAt, table.createdAt)],
 );
 
-export const aiAssistanceRequests = mysqlTable(
+export const aiAssistanceRequests = pgTable(
   "aiAssistanceRequests",
   {
-    id: int("id").autoincrement().primaryKey(),
-    ticketId: int("ticketId").notNull().references(() => tickets.id),
-    requesterId: int("requesterId").notNull().references(() => users.id),
+    id: serial("id").primaryKey(),
+    ticketId: integer("ticketId").notNull().references(() => tickets.id),
+    requesterId: integer("requesterId").notNull().references(() => users.id),
     operation: varchar("operation", { length: 60 }).notNull(),
-    status: mysqlEnum("status", ["pending", "completed", "failed"]).default("pending").notNull(),
+    status: aiAssistanceStatusEnum("status").default("pending").notNull(),
     prompt: text("prompt").notNull(),
     response: text("response"),
     errorMessage: varchar("errorMessage", { length: 500 }),

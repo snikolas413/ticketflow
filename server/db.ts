@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, isNull, like, or } from "drizzle-orm";
 import { randomBytes, scrypt as nodeScrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { nanoid } from "nanoid";
 import {
   InsertUser,
@@ -48,7 +49,7 @@ export async function verifyPassword(password: string, encoded: string) {
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle(new Pool({ connectionString: process.env.DATABASE_URL }));
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -115,7 +116,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
 
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
   if (invitation?.profile === "manager") {
     const signedInUser = (await db.select({ id: users.id }).from(users).where(eq(users.openId, user.openId)).limit(1))[0];
     if (signedInUser && (invitation.departmentId || invitation.teamId)) {
@@ -169,7 +170,7 @@ export async function createInitialLocalAdmin(input: { email: string; password: 
     await db.update(users).set({ name, passwordHash, loginMethod: "local", role: "admin", profile: "manager", active: 1, openId: existing.openId || `local:${email}`, updatedAt: new Date() }).where(eq(users.id, existing.id));
     return (await db.select().from(users).where(eq(users.id, existing.id)).limit(1))[0];
   }
-  const [result] = await db.insert(users).values({
+  const [createdUser] = await db.insert(users).values({
     openId: `local:${email}`,
     name,
     email,
@@ -179,8 +180,8 @@ export async function createInitialLocalAdmin(input: { email: string; password: 
     profile: "manager",
     active: 1,
     lastSignedIn: new Date(),
-  });
-  return (await db.select().from(users).where(eq(users.id, Number(result.insertId))).limit(1))[0];
+  }).returning({ id: users.id });
+  return (await db.select().from(users).where(eq(users.id, createdUser.id)).limit(1))[0];
 }
 
 export async function ensureFirstAdmin(user: User) {
@@ -223,7 +224,7 @@ export async function createUserInvitation(input: { admin: User; email: string; 
   }
   const existing = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
   if (existing?.role === "admin") throw new Error("Este e-mail já pertence a um administrador");
-  await db.insert(userInvitations).values({ email, passwordHash, profile: input.profile, departmentId: input.departmentId, teamId: input.teamId, invitedById: input.admin.id, active: 1 }).onDuplicateKeyUpdate({ set: { passwordHash, profile: input.profile, departmentId: input.departmentId, teamId: input.teamId, invitedById: input.admin.id, active: 1 } });
+  await db.insert(userInvitations).values({ email, passwordHash, profile: input.profile, departmentId: input.departmentId, teamId: input.teamId, invitedById: input.admin.id, active: 1 }).onConflictDoUpdate({ target: userInvitations.email, set: { passwordHash, profile: input.profile, departmentId: input.departmentId, teamId: input.teamId, invitedById: input.admin.id, active: 1 } });
   if (existing) {
     await db.update(users).set({ name: existing.name || email, passwordHash, loginMethod: "local", profile: input.profile, departmentId: input.departmentId ?? null, teamId: input.teamId ?? null, active: 1, updatedAt: new Date() }).where(eq(users.id, existing.id));
   } else {
@@ -561,7 +562,7 @@ export async function saveAttachments(input: { user: User; ticketId: number; com
     if (decoded.buffer.byteLength !== attachment.fileSize) throw new Error("O tamanho informado do arquivo não confere.");
     const safeName = attachment.fileName.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 180) || "arquivo";
     const uploaded = await storagePut(`ticketflow/tickets/${ticket.publicNumber}/${safeName}`, decoded.buffer, attachment.contentType);
-    const [result] = await db.insert(ticketAttachments).values({
+    const [createdAttachment] = await db.insert(ticketAttachments).values({
       ticketId: input.ticketId,
       commentId: input.commentId,
       uploadedById: input.user.id,
@@ -570,8 +571,8 @@ export async function saveAttachments(input: { user: User; ticketId: number; com
       fileSize: attachment.fileSize,
       storageKey: uploaded.key,
       storageUrl: uploaded.url,
-    });
-    saved.push((await db.select().from(ticketAttachments).where(eq(ticketAttachments.id, Number(result.insertId))).limit(1))[0]);
+    }).returning({ id: ticketAttachments.id });
+    saved.push((await db.select().from(ticketAttachments).where(eq(ticketAttachments.id, createdAttachment.id)).limit(1))[0]);
   }
   if (saved.length) await addEvent(input.ticketId, input.user.id, "ticket.attachments_added", { attachmentIds: saved.map(item => item.id) });
   return saved;
@@ -657,7 +658,7 @@ export async function createTicket(input: {
   if (selectedService && input.categoryId && input.categoryId !== selectedService.categoryId) throw new Error("O serviço selecionado não pertence à categoria informada");
   const publicNumber = `TF-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`;
 
-  const [result] = await db.insert(tickets).values({
+  const [createdTicket] = await db.insert(tickets).values({
     publicNumber,
     title: input.title.trim(),
     description: input.description.trim(),
@@ -671,8 +672,8 @@ export async function createTicket(input: {
     priority: input.priority,
     status: "open",
     approvalStatus: "pending",
-  });
-  const ticketId = Number(result.insertId);
+  }).returning({ id: tickets.id });
+  const ticketId = createdTicket.id;
   await addEvent(ticketId, input.user.id, "ticket.created", { publicNumber, status: "open" });
   await createNotification({ userId: input.user.id, ticketId, type: "ticket_created", title: "Chamado aberto", body: `${publicNumber} foi criado e está aguardando atendimento.` });
   const firstApprover = (await db.select({ id: users.id }).from(users).where(and(
@@ -680,8 +681,8 @@ export async function createTicket(input: {
     or(eq(users.role, "admin"), and(eq(users.profile, "approver"), userAreaPredicate(users, departmentId, teamId))),
   )).orderBy(asc(users.id)).limit(5)).find(item => item.id !== input.user.id);
   if (firstApprover) {
-    const [approvalResult] = await db.insert(ticketApprovals).values({ ticketId, approverId: firstApprover.id, requestedById: input.user.id, requestNote: "Aprovação inicial do chamado", status: "pending" });
-    const approvalId = Number(approvalResult.insertId);
+    const [createdApproval] = await db.insert(ticketApprovals).values({ ticketId, approverId: firstApprover.id, requestedById: input.user.id, requestNote: "Aprovação inicial do chamado", status: "pending" }).returning({ id: ticketApprovals.id });
+    const approvalId = createdApproval.id;
     await createNotification({ userId: firstApprover.id, ticketId, approvalId, type: "approval_requested", title: "Aprovação pendente", body: `${publicNumber} aguarda sua aprovação inicial.` });
   }
   if (input.attachments?.length) await saveAttachments({ user: input.user, ticketId, attachments: input.attachments });
@@ -693,15 +694,15 @@ export async function addComment(input: { user: User; ticketId: number; body: st
   if (!db) throw new Error("Database is not available");
   const ticket = await getTicketForUser(input.user, input.ticketId);
   if (!ticket) throw new Error("Ticket not found or not accessible");
-  const [result] = await db.insert(ticketComments).values({
+  const [createdComment] = await db.insert(ticketComments).values({
     ticketId: input.ticketId,
     authorId: input.user.id,
     body: input.body.trim(),
     visibility: input.visibility,
-  });
-  await addEvent(input.ticketId, input.user.id, input.visibility === "internal" ? "comment.internal" : "comment.public", { commentId: Number(result.insertId) });
-  if (input.attachments?.length) await saveAttachments({ user: input.user, ticketId: input.ticketId, commentId: Number(result.insertId), attachments: input.attachments });
-  return db.select().from(ticketComments).where(eq(ticketComments.id, Number(result.insertId))).limit(1).then(rows => rows[0]);
+  }).returning({ id: ticketComments.id });
+  await addEvent(input.ticketId, input.user.id, input.visibility === "internal" ? "comment.internal" : "comment.public", { commentId: createdComment.id });
+  if (input.attachments?.length) await saveAttachments({ user: input.user, ticketId: input.ticketId, commentId: createdComment.id, attachments: input.attachments });
+  return db.select().from(ticketComments).where(eq(ticketComments.id, createdComment.id)).limit(1).then(rows => rows[0]);
 }
 
 const ALLOWED_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
@@ -777,8 +778,8 @@ export async function claimTicket(input: { user: User; ticketId: number }) {
   if (ticket.approvalStatus !== "approved") throw new Error("O chamado ainda aguarda validação do aprovador");
   if (ticket.assigneeId && ticket.assigneeId !== input.user.id) throw new Error("Este chamado já foi assumido por outro atendente");
   if (input.user.role !== "admin" && !(await managerHasTicketScope(input.user, ticket.departmentId, ticket.teamId))) throw new Error("Você não pertence à área responsável por este chamado");
-  const result = await db.update(tickets).set({ assigneeId: input.user.id, status: ticket.status === "open" ? "in_progress" : ticket.status, updatedAt: new Date() }).where(and(eq(tickets.id, input.ticketId), isNull(tickets.assigneeId)));
-  if (!result[0]?.affectedRows) throw new Error("Este chamado já foi assumido por outro atendente");
+  const result = await db.update(tickets).set({ assigneeId: input.user.id, status: ticket.status === "open" ? "in_progress" : ticket.status, updatedAt: new Date() }).where(and(eq(tickets.id, input.ticketId), isNull(tickets.assigneeId))).returning({ id: tickets.id });
+  if (!result.length) throw new Error("Este chamado já foi assumido por outro atendente");
   await addEvent(input.ticketId, input.user.id, "ticket.claimed", { assigneeId: input.user.id });
   await createNotification({ userId: ticket.requesterId, ticketId: input.ticketId, type: "ticket_assigned", title: "Chamado em atendimento", body: `${ticket.publicNumber} foi assumido pela equipe responsável.` });
   return getTicketForUser(input.user, input.ticketId);
@@ -795,8 +796,8 @@ export async function requestApproval(input: { user: User; ticketId: number; app
   if (approver.role !== "admin" && !(approver.teamId ? approver.teamId === ticket.teamId : approver.departmentId === ticket.departmentId)) throw new Error("O aprovador não pertence à área responsável pelo chamado");
   const existing = (await db.select().from(ticketApprovals).where(and(eq(ticketApprovals.ticketId, input.ticketId), eq(ticketApprovals.approverId, input.approverId), eq(ticketApprovals.status, "pending"))).limit(1))[0];
   if (existing) return existing;
-  const [result] = await db.insert(ticketApprovals).values({ ticketId: input.ticketId, approverId: input.approverId, requestedById: input.user.id, requestNote: input.note?.trim() || null, status: "pending" });
-  const approvalId = Number(result.insertId);
+  const [createdApproval] = await db.insert(ticketApprovals).values({ ticketId: input.ticketId, approverId: input.approverId, requestedById: input.user.id, requestNote: input.note?.trim() || null, status: "pending" }).returning({ id: ticketApprovals.id });
+  const approvalId = createdApproval.id;
   await createNotification({ userId: input.approverId, ticketId: input.ticketId, approvalId, type: "approval_requested", title: "Aprovação pendente", body: `${ticket.publicNumber} aguarda sua aprovação.` });
   return (await db.select().from(ticketApprovals).where(eq(ticketApprovals.id, approvalId)).limit(1))[0];
 }
@@ -832,14 +833,14 @@ export async function decideApproval(input: { user: User; approvalId: number; st
 export async function createAiRequest(input: { ticketId: number; requesterId: number; operation: string; prompt: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  const [result] = await db.insert(aiAssistanceRequests).values({
+  const [createdRequest] = await db.insert(aiAssistanceRequests).values({
     ticketId: input.ticketId,
     requesterId: input.requesterId,
     operation: input.operation,
     prompt: input.prompt,
     status: "pending",
-  });
-  return Number(result.insertId);
+  }).returning({ id: aiAssistanceRequests.id });
+  return createdRequest.id;
 }
 
 export async function completeAiRequest(id: number, response: string) {
