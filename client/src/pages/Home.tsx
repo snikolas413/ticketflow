@@ -145,7 +145,7 @@ export default function Home() {
   // Query for ONLY tickets assigned to the logged-in user
   const myTicketsQuery = trpc.tickets.list.useQuery(
     {
-      assignedToMe: true,
+      myTickets: true,
       search: currentTab === "my_tickets" && search ? search : undefined,
       status: currentTab === "my_tickets" && statusFilter !== "all" ? statusFilter : undefined,
       priority: currentTab === "my_tickets" && priorityFilter !== "all" ? priorityFilter : undefined,
@@ -176,8 +176,8 @@ export default function Home() {
   const myRows = useMemo(() => {
     const data = myTicketsQuery.data ?? [];
     if (!effectiveUser?.id) return data;
-    // Strict client guarantee: only tickets assigned to the logged in user
-    return data.filter((t) => t.assigneeId === effectiveUser.id);
+    // The personal list includes tickets opened by the user and tickets assigned to them.
+    return data.filter((t) => t.requesterId === effectiveUser.id || t.assigneeId === effectiveUser.id);
   }, [myTicketsQuery.data, effectiveUser?.id]);
 
   // Overall metrics
@@ -199,6 +199,7 @@ export default function Home() {
     );
 
     const myAssignedCount = allRows.filter((t) => t.assigneeId === effectiveUser?.id).length;
+    const myTicketCount = allRows.filter((t) => t.requesterId === effectiveUser?.id || t.assigneeId === effectiveUser?.id).length;
     const unassignedCount = allRows.filter((t) => !t.assigneeId && t.status !== "closed").length;
     const pendingApprovalCount = allRows.filter((t) => t.approvalStatus === "pending").length;
 
@@ -215,6 +216,7 @@ export default function Home() {
       low,
       criticalTickets,
       myAssignedCount,
+      myTicketCount,
       unassignedCount,
       pendingApprovalCount,
     };
@@ -298,7 +300,7 @@ export default function Home() {
                   currentTab === "my_tickets" ? "bg-[#3157d5] text-white" : "bg-[#e5e8f0] text-[#526079]"
                 }`}
               >
-                {metrics.myAssignedCount}
+                {metrics.myTicketCount}
               </span>
             </button>
 
