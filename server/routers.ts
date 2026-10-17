@@ -115,6 +115,7 @@ export const appRouter = router({
       status: z.enum(TICKET_STATUSES).optional(),
       priority: z.enum(PRIORITIES).optional(),
       assignedToMe: z.boolean().optional(),
+      myTickets: z.boolean().optional(),
     }).optional()).query(({ ctx, input }) => listTickets(ctx.user, input ?? {})),
     create: protectedProcedure.input(ticketInput).mutation(({ ctx, input }) => createTicket({ user: ctx.user, ...input })),
     detail: protectedProcedure.input(z.object({ ticketId: z.number().int().positive() })).query(async ({ ctx, input }) => {
