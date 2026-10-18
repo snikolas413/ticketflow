@@ -488,7 +488,7 @@ export async function getTicketForUser(user: User, ticketId: number) {
   }
   if (user.role !== "admin" && ticket.requesterId !== user.id && ticket.assigneeId !== user.id) {
     const approvalAccess = (await db.select({ id: ticketApprovals.id }).from(ticketApprovals).where(and(eq(ticketApprovals.ticketId, ticketId), or(eq(ticketApprovals.approverId, user.id), eq(ticketApprovals.requestedById, user.id)))).limit(1)).length > 0;
-    if (!approvalAccess && (user.profile !== "manager" || !(await managerHasTicketScope(user, ticket.departmentId, ticket.teamId)))) {
+    if (!approvalAccess && !(await managerHasTicketScope(user, ticket.departmentId, ticket.teamId))) {
       await recordAudit({ actorId: user.id, ticketId, action: "ticket.access_denied", resource: "ticket", payload: { reason: "outside_scope" } });
       return null;
     }
@@ -496,9 +496,17 @@ export async function getTicketForUser(user: User, ticketId: number) {
   return ticket;
 }
 
+export function isUserInTicketArea(
+  user: Pick<User, "profile" | "teamId" | "departmentId">,
+  ticket: Pick<typeof tickets.$inferSelect, "teamId" | "departmentId">,
+) {
+  if (user.profile !== "agent" && user.profile !== "approver") return false;
+  return user.teamId ? user.teamId === ticket.teamId : user.departmentId === ticket.departmentId;
+}
+
 async function managerHasTicketScope(user: User, departmentId: number, teamId: number) {
   if (user.role === "admin") return true;
-  if ((user.profile === "agent" || user.profile === "approver") && (user.teamId ? user.teamId === teamId : user.departmentId === departmentId)) return true;
+  if (isUserInTicketArea(user, { departmentId, teamId })) return true;
   if (user.profile !== "manager") return false;
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
