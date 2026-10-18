@@ -173,6 +173,7 @@ export default function Home() {
 
   const effectiveUser = foundation.data?.user ?? user;
   const allRows = allTicketsQuery.data ?? [];
+  const hasActiveFilters = Boolean(search.trim()) || statusFilter !== "all" || priorityFilter !== "all";
   const myRows = useMemo(() => {
     const data = myTicketsQuery.data ?? [];
     if (!effectiveUser?.id) return data;
@@ -879,21 +880,53 @@ export default function Home() {
                     <div className="skeleton-line w-full" />
                     <div className="skeleton-line w-5/6" />
                   </div>
+                ) : allTicketsQuery.isError ? (
+                  <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                    <p className="text-base font-bold text-[#253252]">Não foi possível carregar os chamados</p>
+                    <p className="mt-1 max-w-xs text-xs text-[#8791a5]">
+                      Verifique sua conexão e tente novamente. Seus chamados não foram alterados.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-5 text-xs font-semibold"
+                      onClick={() => void allTicketsQuery.refetch()}
+                    >
+                      Tentar novamente
+                    </Button>
+                  </div>
                 ) : allRows.length === 0 ? (
                   <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
                     <div className="mb-4 rounded-2xl bg-[#eef2ff] p-4 text-[#3157d5]">
                       <Ticket className="size-8" />
                     </div>
-                    <p className="text-base font-bold text-[#253252]">Nenhum chamado encontrado</p>
-                    <p className="mt-1 max-w-xs text-xs text-[#8791a5]">
-                      Crie o primeiro chamado ou ajuste os filtros para visualizar resultados.
+                    <p className="text-base font-bold text-[#253252]">
+                      {hasActiveFilters ? "Nenhum chamado corresponde aos filtros" : "Nenhum chamado cadastrado"}
                     </p>
-                    <Button
-                      className="mt-5 bg-[#3157d5] text-xs font-semibold text-white hover:bg-[#2747b8]"
-                      onClick={() => setShowCreate(true)}
-                    >
-                      <Plus className="mr-1.5 size-3.5" /> Criar Chamado
-                    </Button>
+                    <p className="mt-1 max-w-xs text-xs text-[#8791a5]">
+                      {hasActiveFilters
+                        ? "Tente ajustar a busca ou remova os filtros para ver mais resultados."
+                        : "Quando um chamado for aberto, ele aparecerá nesta lista."}
+                    </p>
+                    {hasActiveFilters ? (
+                      <Button
+                        variant="outline"
+                        className="mt-5 text-xs font-semibold"
+                        onClick={() => {
+                          setSearch("");
+                          setStatusFilter("all");
+                          setPriorityFilter("all");
+                        }}
+                      >
+                        Limpar filtros
+                      </Button>
+                    ) : (
+                      <Button
+                        className="mt-5 bg-[#3157d5] text-xs font-semibold text-white hover:bg-[#2747b8]"
+                        onClick={() => setShowCreate(true)}
+                      >
+                        <Plus className="mr-1.5 size-3.5" /> Criar Chamado
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="divide-y divide-[#edf0f5]">
