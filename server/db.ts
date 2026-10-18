@@ -732,7 +732,7 @@ export async function transitionTicket(input: { user: User; ticketId: number; st
     updatedAt: new Date(),
     // Clear lifecycle timestamps when a ticket leaves the corresponding terminal state.
     // This keeps reopened tickets from carrying stale resolution/closure dates.
-    resolvedAt: input.status === "resolved" ? new Date() : null,
+    resolvedAt: input.status === "resolved" ? new Date() : input.status === "closed" ? ticket.resolvedAt : null,
     closedAt: input.status === "closed" ? new Date() : null,
   }).where(eq(tickets.id, input.ticketId));
   await addEvent(input.ticketId, input.user.id, "ticket.status_changed", { from: ticket.status, to: input.status, comment: input.comment ?? null });
