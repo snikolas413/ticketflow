@@ -760,6 +760,10 @@ export async function assignTicket(input: { user: User; ticketId: number; assign
   return getTicketForUser(input.user, input.ticketId);
 }
 
+export function isClaimAlreadyOwnedByUser(assigneeId: number | null, userId: number) {
+  return assigneeId === userId;
+}
+
 export async function claimTicket(input: { user: User; ticketId: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
@@ -769,6 +773,9 @@ export async function claimTicket(input: { user: User; ticketId: number }) {
   if (ticket.approvalStatus !== "approved") throw new Error("O chamado ainda aguarda validação do aprovador");
   if (ticket.assigneeId && ticket.assigneeId !== input.user.id) throw new Error("Este chamado já foi assumido por outro atendente");
   if (input.user.role !== "admin" && !(await managerHasTicketScope(input.user, ticket.departmentId, ticket.teamId))) throw new Error("Você não pertence à área responsável por este chamado");
+  // Treat a repeated claim by the same user as a successful no-op. This avoids a
+  // misleading conflict while preserving the conditional update below for races.
+  if (isClaimAlreadyOwnedByUser(ticket.assigneeId, input.user.id)) return getTicketForUser(input.user, input.ticketId);
   const result = await db.update(tickets).set({ assigneeId: input.user.id, status: ticket.status === "open" ? "in_progress" : ticket.status, updatedAt: new Date() }).where(and(eq(tickets.id, input.ticketId), isNull(tickets.assigneeId))).returning({ id: tickets.id });
   if (!result.length) throw new Error("Este chamado já foi assumido por outro atendente");
   await addEvent(input.ticketId, input.user.id, "ticket.claimed", { assigneeId: input.user.id });
