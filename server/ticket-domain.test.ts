@@ -25,6 +25,10 @@ describe("ticket area access", () => {
     expect(isUserInTicketArea({ profile: "approver", departmentId: 10, teamId: null }, ticket)).toBe(true);
   });
 
+  it("allows an agent without a team when the department matches", () => {
+    expect(isUserInTicketArea({ profile: "agent", departmentId: 10, teamId: null }, ticket)).toBe(true);
+  });
+
   it("does not allow an agent from a different team to access by area", () => {
     expect(isUserInTicketArea({ profile: "agent", departmentId: 10, teamId: 21 }, ticket)).toBe(false);
   });
