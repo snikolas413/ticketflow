@@ -29,6 +29,7 @@ export default function Admin() {
   const currentUser = bootstrap.data?.user ?? user;
   const [, setLocation] = useLocation();
 
+  const [slaDrafts, setSlaDrafts] = useState<Record<string, { firstResponseHours: number; resolutionHours: number }>>({});
   const [sectorName, setSectorName] = useState("");
   const [sectorCode, setSectorCode] = useState("");
   const [teamName, setTeamName] = useState("");
@@ -63,11 +64,13 @@ export default function Admin() {
   const ticketTypes = trpc.catalog.ticketTypes.useQuery(undefined, { enabled });
   const categories = trpc.catalog.categories.useQuery(undefined, { enabled });
   const services = trpc.catalog.services.useQuery(undefined, { enabled });
+  const slaPolicies = trpc.admin.slaPolicies.useQuery(undefined, { enabled });
   const attachments = trpc.admin.attachments.useQuery(undefined, { enabled });
   const audit = trpc.admin.audit.useQuery(undefined, { enabled });
   const users = trpc.admin.users.useQuery(undefined, { enabled });
   const managerScopes = trpc.admin.managerScopes.useQuery({ userId: managerUserId ?? 0 }, { enabled: Boolean(enabled && managerUserId) });
 
+  const updateSlaPolicy = trpc.admin.updateSlaPolicy.useMutation({ onSuccess: () => { toast.success("Política de SLA salva"); void slaPolicies.refetch(); }, onError: error => toast.error(error.message) });
   const createDepartment = trpc.catalog.createDepartment.useMutation({ onSuccess: () => { toast.success("Setor criado"); setSectorName(""); setSectorCode(""); void departments.refetch(); }, onError: error => toast.error(error.message) });
   const createTeam = trpc.catalog.createTeam.useMutation({ onSuccess: () => { toast.success("Equipe criada no setor"); setTeamName(""); setTeamDepartmentId(undefined); void teams.refetch(); }, onError: error => toast.error(error.message) });
   const createQueue = trpc.catalog.createQueue.useMutation({ onSuccess: () => { toast.success("Fila criada na equipe"); setQueueName(""); setQueueTeamId(undefined); void queues.refetch(); }, onError: error => toast.error(error.message) });
@@ -120,6 +123,24 @@ export default function Admin() {
 
 
         <TabsContent value="operations" className="mt-6 space-y-6">
+          <Card className="border-[#e5e8f0] shadow-none">
+            <CardHeader><SectionIntro icon={Settings2} eyebrow="Acordos de atendimento" title="Políticas de SLA por prioridade" description="Prazos iniciais em horas corridas, editáveis pela administração. Confirme os valores com o negócio antes de tratá-los como compromisso oficial." tone="purple" /></CardHeader>
+            <CardContent>
+              {slaPolicies.isLoading ? <Loader2 className="size-5 animate-spin text-[#3157d5]" /> : (
+                <div className="space-y-3">
+                  {(slaPolicies.data ?? []).map(policy => {
+                    const draft = slaDrafts[policy.priority] ?? { firstResponseHours: policy.firstResponseHours, resolutionHours: policy.resolutionHours };
+                    return <div key={policy.priority} className="grid gap-3 rounded-xl border border-[#edf0f5] p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+                      <div><p className="mb-1 text-xs font-semibold capitalize text-[#253252]">Prioridade {policy.priority === "low" ? "baixa" : policy.priority === "medium" ? "média" : policy.priority === "high" ? "alta" : "urgente"}</p><p className="text-[10px] text-[#8791a5]">Horas corridas</p></div>
+                      <label className="text-xs text-[#526079]">1ª resposta (h)<Input inputType="number" min={0.25} step={0.25} value={String(draft.firstResponseHours)} onChange={value => setSlaDrafts(prev => ({ ...prev, [policy.priority]: { ...draft, firstResponseHours: Number(value) } }))} /></label>
+                      <label className="text-xs text-[#526079]">Resolução (h)<Input inputType="number" min={0.25} step={0.25} value={String(draft.resolutionHours)} onChange={value => setSlaDrafts(prev => ({ ...prev, [policy.priority]: { ...draft, resolutionHours: Number(value) } }))} /></label>
+                      <Button size="sm" disabled={updateSlaPolicy.isPending || draft.firstResponseHours <= 0 || draft.resolutionHours <= 0} onClick={() => updateSlaPolicy.mutate({ priority: policy.priority as "low" | "medium" | "high" | "urgent", ...draft })}>Salvar</Button>
+                    </div>;
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
           <Card className="border-[#fecaca] bg-[#fff8f8] shadow-none">
             <CardHeader>
               <div className="flex items-start gap-3">
