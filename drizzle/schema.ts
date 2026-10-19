@@ -200,6 +200,7 @@ export const tickets = pgTable(
     approvalStatus: approvalStatusEnum("approvalStatus").default("pending").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+    firstRespondedAt: timestamp("firstRespondedAt"),
     resolvedAt: timestamp("resolvedAt"),
     closedAt: timestamp("closedAt"),
   },
