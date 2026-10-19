@@ -424,6 +424,29 @@ export async function createService(input: { name: string; code: string; descrip
   return (await db.select().from(services).where(eq(services.code, code)).limit(1))[0];
 }
 
+export async function updateServiceRouting(admin: User, input: { serviceId: number; defaultTicketTypeId: number | null; defaultQueueId: number | null }) {
+  if (admin.role !== "admin") throw new Error("Only administrators can configure service routing");
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const service = (await db.select().from(services).where(eq(services.id, input.serviceId)).limit(1))[0];
+  if (!service) throw new Error("Serviço não encontrado");
+  if (input.defaultTicketTypeId !== null) {
+    const type = (await db.select().from(ticketTypes).where(and(eq(ticketTypes.id, input.defaultTicketTypeId), eq(ticketTypes.active, 1))).limit(1))[0];
+    if (!type) throw new Error("Tipo padrão não encontrado ou inativo");
+  }
+  if (input.defaultQueueId !== null) {
+    const queue = (await db.select().from(queues).where(and(eq(queues.id, input.defaultQueueId), eq(queues.active, 1))).limit(1))[0];
+    if (!queue) throw new Error("Fila padrão não encontrada ou inativa");
+  }
+  await db.update(services).set({
+    defaultTicketTypeId: input.defaultTicketTypeId,
+    defaultQueueId: input.defaultQueueId,
+    updatedAt: new Date(),
+  }).where(eq(services.id, input.serviceId));
+  await recordAudit({ actorId: admin.id, action: "catalog.service_routing_updated", resource: "service", payload: { serviceId: input.serviceId, defaultTicketTypeId: input.defaultTicketTypeId, defaultQueueId: input.defaultQueueId } });
+  return (await db.select().from(services).where(eq(services.id, input.serviceId)).limit(1))[0];
+}
+
 export type TicketFilters = {
   search?: string;
   status?: TicketStatus;
@@ -628,34 +651,41 @@ export async function createTicket(input: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  const departmentId = input.departmentId;
-  if (!departmentId) throw new Error("Cadastre e selecione um setor antes de abrir chamados");
-  const selectedDepartment = (await db.select().from(departments).where(and(eq(departments.id, departmentId), eq(departments.active, 1))).limit(1))[0];
-  if (!selectedDepartment) throw new Error("Setor não encontrado ou inativo");
-  const selectedTeam = input.teamId
-    ? (await db.select().from(teams).where(eq(teams.id, input.teamId)).limit(1))[0]
-    : (await db.select().from(teams).where(eq(teams.departmentId, departmentId)).orderBy(asc(teams.id)).limit(1))[0];
-  if (!selectedTeam || selectedTeam.departmentId !== departmentId || !selectedTeam.active) throw new Error("O setor precisa ter uma equipe ativa responsável");
-  const teamId = selectedTeam.id;
-  const selectedQueue = input.queueId
-    ? (await db.select().from(queues).where(eq(queues.id, input.queueId)).limit(1))[0]
-    : (await db.select().from(queues).where(eq(queues.teamId, teamId)).orderBy(asc(queues.id)).limit(1))[0];
-  if (!selectedQueue || selectedQueue.teamId !== teamId || selectedQueue.departmentId !== departmentId || !selectedQueue.active) throw new Error("A equipe precisa ter uma fila ativa responsável");
-  const queueId = selectedQueue.id;
-  const selectedType = input.ticketTypeId
-    ? (await db.select().from(ticketTypes).where(and(eq(ticketTypes.id, input.ticketTypeId), eq(ticketTypes.active, 1))).limit(1))[0]
-    : undefined;
-  if (!selectedType) throw new Error("Cadastre e selecione um tipo de chamado antes de abrir chamados");
-  const ticketTypeId = selectedType.id;
-  const selectedCategory = input.categoryId
-    ? (await db.select().from(serviceCategories).where(and(eq(serviceCategories.id, input.categoryId), eq(serviceCategories.active, 1))).limit(1))[0]
-    : undefined;
-  if (input.categoryId && !selectedCategory) throw new Error("Categoria não encontrada ou inativa");
+  // Resolve the service first so its configured defaults drive the real workflow.
   const selectedService = input.serviceId
     ? (await db.select().from(services).where(and(eq(services.id, input.serviceId), eq(services.active, 1))).limit(1))[0]
     : undefined;
   if (input.serviceId && !selectedService) throw new Error("Serviço não encontrado ou inativo");
+  const selectedCategory = input.categoryId
+    ? (await db.select().from(serviceCategories).where(and(eq(serviceCategories.id, input.categoryId), eq(serviceCategories.active, 1))).limit(1))[0]
+    : undefined;
+  if (input.categoryId && !selectedCategory) throw new Error("Categoria não encontrada ou inativa");
   if (selectedService && input.categoryId && input.categoryId !== selectedService.categoryId) throw new Error("O serviço selecionado não pertence à categoria informada");
+  const resolvedTypeId = input.ticketTypeId ?? selectedService?.defaultTicketTypeId;
+  const selectedType = resolvedTypeId
+    ? (await db.select().from(ticketTypes).where(and(eq(ticketTypes.id, resolvedTypeId), eq(ticketTypes.active, 1))).limit(1))[0]
+    : undefined;
+  if (!selectedType) throw new Error("Configure um tipo padrão para o serviço ou selecione um tipo de chamado");
+  const ticketTypeId = selectedType.id;
+  const resolvedQueueId = input.queueId ?? selectedService?.defaultQueueId ?? selectedType.defaultQueueId;
+  const selectedQueue = resolvedQueueId
+    ? (await db.select().from(queues).where(and(eq(queues.id, resolvedQueueId), eq(queues.active, 1))).limit(1))[0]
+    : undefined;
+  if (resolvedQueueId && !selectedQueue) throw new Error("A fila padrão configurada não existe ou está inativa");
+  const departmentId = selectedQueue?.departmentId ?? input.departmentId;
+  if (!departmentId) throw new Error("Cadastre um setor ou configure uma fila padrão para o serviço/tipo");
+  const selectedDepartment = (await db.select().from(departments).where(and(eq(departments.id, departmentId), eq(departments.active, 1))).limit(1))[0];
+  if (!selectedDepartment) throw new Error("Setor não encontrado ou inativo");
+  const selectedTeam = selectedQueue
+    ? (await db.select().from(teams).where(and(eq(teams.id, selectedQueue.teamId), eq(teams.active, 1))).limit(1))[0]
+    : input.teamId
+      ? (await db.select().from(teams).where(eq(teams.id, input.teamId)).limit(1))[0]
+      : (await db.select().from(teams).where(and(eq(teams.departmentId, departmentId), eq(teams.active, 1))).orderBy(asc(teams.id)).limit(1))[0];
+  if (!selectedTeam || selectedTeam.departmentId !== departmentId || !selectedTeam.active) throw new Error("O setor precisa ter uma equipe ativa responsável");
+  const teamId = selectedTeam.id;
+  const finalQueue = selectedQueue ?? (await db.select().from(queues).where(and(eq(queues.teamId, teamId), eq(queues.departmentId, departmentId), eq(queues.active, 1))).orderBy(asc(queues.id)).limit(1))[0];
+  if (!finalQueue || finalQueue.teamId !== teamId || finalQueue.departmentId !== departmentId || !finalQueue.active) throw new Error("A equipe precisa ter uma fila ativa responsável");
+  const queueId = finalQueue.id;
   const publicNumber = `TF-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`;
 
   const [createdTicket] = await db.insert(tickets).values({

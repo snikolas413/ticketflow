@@ -1012,7 +1012,12 @@ export default function Home() {
                   <label className="field-label">Serviço</label>
                   <select
                     value={serviceId ?? ""}
-                    onChange={(event) => setServiceId(Number(event.target.value))}
+                    onChange={(event) => {
+                      const nextServiceId = Number(event.target.value) || undefined;
+                      setServiceId(nextServiceId);
+                      const configuredService = (services.data ?? []).find(item => item.id === nextServiceId);
+                      if (configuredService?.defaultTicketTypeId) setTicketTypeId(configuredService.defaultTicketTypeId);
+                    }}
                     className="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">Selecionar serviço</option>
@@ -1117,8 +1122,8 @@ export default function Home() {
                 <Button
                   disabled={
                     createTicket.isPending ||
-                    !departmentId ||
-                    !ticketTypeId ||
+                    (!departmentId && !(services.data ?? []).find(item => item.id === serviceId)?.defaultQueueId) ||
+                    (!ticketTypeId && !(services.data ?? []).find(item => item.id === serviceId)?.defaultTicketTypeId) ||
                     title.trim().length < 4 ||
                     description.trim().length < 8
                   }
