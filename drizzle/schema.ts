@@ -3,6 +3,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  real,
   serial,
   text,
   timestamp,
@@ -179,6 +180,13 @@ export const services = pgTable(
   },
   table => [index("services_category_idx").on(table.categoryId, table.active)],
 );
+
+export const slaPolicies = pgTable("slaPolicies", {
+  priority: varchar("priority", { length: 20 }).primaryKey(),
+  firstResponseHours: real("firstResponseHours").notNull(),
+  resolutionHours: real("resolutionHours").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
 
 export const tickets = pgTable(
   "tickets",
