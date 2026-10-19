@@ -249,7 +249,7 @@ export default function Home() {
     const users = adminUsers.data ?? [];
     const activeTickets = allRows.filter((ticket) => ticket.status !== "resolved" && ticket.status !== "closed");
     const workload = users
-      .filter((person) => person.active !== 0 && person.active !== false)
+      .filter((person) => person.active !== 0)
       .map((person) => {
         const assigned = allRows.filter((ticket) => ticket.assigneeId === person.id);
         const active = activeTickets.filter((ticket) => ticket.assigneeId === person.id);
