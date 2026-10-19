@@ -13,6 +13,12 @@ services:
         value: "3000"
       - key: DATABASE_URL
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: ticket-attachments
       - key: MANUS_PROJECT_ID
         value: ticketflow-production
       - key: MANUS_JWT_SECRET
