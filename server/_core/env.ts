@@ -3,9 +3,9 @@ export const ENV = {
   get appId() { return process.env.APP_ID ?? process.env.MANUS_PROJECT_ID ?? "ticketflow-production"; },
   get cookieSecret() { return process.env.SESSION_SECRET ?? process.env.MANUS_JWT_SECRET ?? ""; },
   get databaseUrl() { return process.env.DATABASE_URL ?? ""; },
-  // Keep Forge settings for existing AI, notification, and platform integrations.
-  get forgeApiUrl() { return process.env.MANUS_API_URL ?? ""; },
-  get forgeApiKey() { return process.env.MANUS_API_KEY ?? ""; },
+  // Optional OpenAI-compatible provider for AI assistance. No Manus endpoint is used.
+  get aiApiUrl() { return process.env.AI_API_URL ?? ""; },
+  get aiApiKey() { return process.env.AI_API_KEY ?? ""; },
   // Preserve the legacy hint when supplied; otherwise roles remain application data.
   get ownerOpenId() { return process.env.OWNER_OPEN_ID ?? ""; },
   get isProduction() { return process.env.NODE_ENV === "production"; },
