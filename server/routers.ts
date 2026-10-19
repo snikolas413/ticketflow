@@ -113,6 +113,7 @@ export const appRouter = router({
     decide: protectedProcedure.input(z.object({ approvalId: z.number().int().positive(), status: z.enum(["approved", "rejected"]), note: z.string().trim().max(2000).optional() })).mutation(({ ctx, input }) => decideApproval({ user: ctx.user, ...input })),
   }),
   tickets: router({
+    slaPolicies: protectedProcedure.query(() => listSlaPolicies()),
     list: protectedProcedure.input(z.object({
       search: z.string().trim().max(80).optional(),
       status: z.enum(TICKET_STATUSES).optional(),
