@@ -31,10 +31,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[var(--app-background)] text-[var(--app-foreground)] transition-colors">
-      <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 flex w-[252px] flex-col border-r border-white/5 bg-[#101116] px-4 py-5 text-white transition-transform lg:translate-x-0",
-        mobileOpen ? "translate-x-0" : "-translate-x-full",
-      )}>
+      <aside className={cn("fixed inset-y-0 left-0 z-50 flex w-[252px] flex-col border-r border-white/5 bg-[#101116] px-4 py-5 text-white transition-transform lg:translate-x-0", mobileOpen ? "translate-x-0" : "-translate-x-full")}>
         <div className="flex items-center justify-between px-2">
           <button className="flex items-center gap-3 text-left" onClick={() => { setLocation("/"); setMobileOpen(false); }} aria-label="Ir para visão geral">
             <span className="brand-mark"><span /><span /></span>
@@ -42,20 +39,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <button className="rounded-lg p-2 text-slate-400 hover:bg-white/10 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Fechar menu"><X className="size-4" /></button>
         </div>
-
         <div className="mt-12 px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Workspace</div>
-        <nav className="mt-3 space-y-1">
-          {navItems.map(item => {
-            const active = location === item.path && !activeDetail;
-            return <button key={item.label} onClick={() => { setLocation(item.path); setMobileOpen(false); }} className={cn("sidebar-link", active && "sidebar-link-active")}><item.icon className="size-[17px]" /><span>{item.label}</span></button>;
-          })}
-        </nav>
-
+        <nav className="mt-3 space-y-1">{navItems.map(item => {
+          const active = location === item.path && !activeDetail;
+          return <button key={item.label} onClick={() => { setLocation(item.path); setMobileOpen(false); }} className={cn("sidebar-link", active && "sidebar-link-active")}><item.icon className="size-[17px]" /><span>{item.label}</span></button>;
+        })}</nav>
         <div className="mt-10 px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Configuração</div>
-        <nav className="mt-3 space-y-1">
-          {currentUser?.role === "admin" && <button className={cn("sidebar-link", activeAdmin && "sidebar-link-active")} onClick={() => { setLocation("/admin"); setMobileOpen(false); }}><Settings2 className="size-[17px]" /><span>Configuração</span></button>}
-        </nav>
-
+        <nav className="mt-3 space-y-1">{currentUser?.role === "admin" && <button className={cn("sidebar-link", activeAdmin && "sidebar-link-active")} onClick={() => { setLocation("/admin"); setMobileOpen(false); }}><Settings2 className="size-[17px]" /><span>Configuração</span></button>}</nav>
         <div className="mt-auto space-y-3 border-t border-white/10 pt-4">
           <button onClick={toggleTheme} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-medium text-slate-300 transition hover:bg-white/[0.07] hover:text-white" aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}>
             {theme === "dark" ? <Sun className="size-4 text-[#ff6679]" /> : <Moon className="size-4 text-[#ff6679]" />}
@@ -69,7 +59,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </aside>
-
       {mobileOpen && <button className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Fechar menu" />}
       <main className="min-h-screen lg:pl-[252px]">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--app-border)] bg-[var(--app-background)]/90 px-5 py-3 backdrop-blur-xl sm:px-8">
