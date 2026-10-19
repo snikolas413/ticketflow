@@ -7,6 +7,7 @@ export const ENV = {
   // Preserve the legacy hint when supplied; otherwise roles remain application data.
   get ownerOpenId() { return process.env.OWNER_OPEN_ID ?? ""; },
   get isProduction() { return process.env.NODE_ENV === "production"; },
-  get forgeApiUrl() { return process.env.MANUS_API_URL ?? ""; },
-  get forgeApiKey() { return process.env.MANUS_API_KEY ?? ""; },
+  get supabaseUrl() { return process.env.SUPABASE_URL ?? ""; },
+  get supabaseServiceRoleKey() { return process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""; },
+  get supabaseStorageBucket() { return process.env.SUPABASE_STORAGE_BUCKET ?? "ticket-attachments"; },
 };
