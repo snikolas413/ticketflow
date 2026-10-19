@@ -136,6 +136,7 @@ export default function Home() {
   const categories = trpc.catalog.categories.useQuery(undefined, { enabled: Boolean(user), staleTime: 60_000 });
   const services = trpc.catalog.services.useQuery({ categoryId }, { enabled: Boolean(user), staleTime: 60_000 });
   const slaPolicies = trpc.tickets.slaPolicies.useQuery(undefined, { enabled: Boolean(user), staleTime: 60_000 });
+  const adminUsers = trpc.admin.users.useQuery(undefined, { enabled: user?.role === "admin", staleTime: 60_000 });
 
   // Query for general tickets (overview & all tickets)
   const allTicketsQuery = trpc.tickets.list.useQuery(
@@ -243,6 +244,22 @@ export default function Home() {
     return { sampleSize: completedWithResolution.length, averageHours };
   }, [allRows]);
 
+  // Workload view is admin-only and uses the complete admin ticket queue.
+  const assigneeWorkload = useMemo(() => {
+    const users = adminUsers.data ?? [];
+    const activeTickets = allRows.filter((ticket) => ticket.status !== "resolved" && ticket.status !== "closed");
+    const workload = users
+      .filter((person) => person.active !== 0 && person.active !== false)
+      .map((person) => {
+        const assigned = allRows.filter((ticket) => ticket.assigneeId === person.id);
+        const active = activeTickets.filter((ticket) => ticket.assigneeId === person.id);
+        const completed = assigned.filter((ticket) => ticket.status === "resolved" || ticket.status === "closed");
+        return { id: person.id, name: person.name || person.email || ("Usuário " + person.id), active: active.length, completed: completed.length };
+      })
+      .filter((person) => person.active > 0 || person.completed > 0)
+      .sort((a, b) => b.active - a.active || b.completed - a.completed);
+    return { workload, unassigned: activeTickets.filter((ticket) => !ticket.assigneeId).length };
+  }, [adminUsers.data, allRows]);
   // SLA health summary for the management dashboard. Only active deadlines are counted.
   const slaSummary = useMemo(() => {
     let overdue = 0;
@@ -493,6 +510,48 @@ export default function Home() {
                 </Badge>
               </CardContent>
             </Card>
+
+            {effectiveUser?.role === "admin" && (
+              <Card className="border-[#e5e8f0] shadow-sm">
+                <CardHeader className="border-b border-[#edf0f5] pb-4">
+                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                    <div>
+                      <CardTitle className="text-base text-[#15213d]">Carga por responsável</CardTitle>
+                      <p className="mt-1 text-xs text-[#8791a5]">Chamados ativos e concluídos por atendente, com base nos chamados disponíveis na fila geral</p>
+                    </div>
+                    <Badge variant="outline" className="w-fit border-[#d5ddf0] text-[#526079]">
+                      {assigneeWorkload.workload.length} responsável(is) com histórico
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {adminUsers.isLoading ? (
+                    <p className="p-5 text-sm text-[#8791a5]">Carregando responsáveis...</p>
+                  ) : assigneeWorkload.workload.length === 0 ? (
+                    <p className="p-5 text-sm text-[#8791a5]">Ainda não há chamados atribuídos a responsáveis.</p>
+                  ) : (
+                    <div className="divide-y divide-[#edf0f5]">
+                      {assigneeWorkload.workload.slice(0, 8).map((person) => (
+                        <div key={person.id} className="flex items-center justify-between gap-4 px-5 py-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-[#15213d]">{person.name}</p>
+                            <p className="mt-0.5 text-xs text-[#8791a5]">{person.completed} concluído(s)</p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-lg font-semibold text-[#15213d]">{person.active}</p>
+                            <p className="text-[11px] text-[#6c7891]">ativo(s)</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="border-t border-[#edf0f5] bg-[#f8f9fc] px-5 py-3 text-xs text-[#6c7891]">
+                    Sem responsável: <strong className="text-[#15213d]">{assigneeWorkload.unassigned}</strong> chamado(s) ativo(s).
+                    <span className="ml-1">Exibe até 8 responsáveis, ordenados pela maior fila ativa.</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Analytical Insights Row */}
             <div className="grid gap-6 lg:grid-cols-3">
