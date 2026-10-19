@@ -1,9 +1,8 @@
 // Platform values are read at use time. See the Webdev service/authentication skills.
 export const ENV = {
-  get appId() { return process.env.MANUS_PROJECT_ID ?? ""; },
-  get cookieSecret() { return process.env.MANUS_JWT_SECRET ?? ""; },
+  get appId() { return process.env.APP_ID ?? process.env.MANUS_PROJECT_ID ?? "ticketflow-production"; },
+  get cookieSecret() { return process.env.SESSION_SECRET ?? process.env.MANUS_JWT_SECRET ?? ""; },
   get databaseUrl() { return process.env.DATABASE_URL ?? ""; },
-  get oAuthServerUrl() { return process.env.MANUS_OAUTH_API_URL ?? ""; },
   // Keep Forge settings for existing AI, notification, and platform integrations.
   get forgeApiUrl() { return process.env.MANUS_API_URL ?? ""; },
   get forgeApiKey() { return process.env.MANUS_API_KEY ?? ""; },
