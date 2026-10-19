@@ -8,7 +8,6 @@ import express from "express";
 import { createServer } from "http";
 import { sql } from "drizzle-orm";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { publicPlatformScript } from "./publicConfig";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -29,9 +28,6 @@ async function startServer() {
     } catch {
       return res.status(503).json({ status: "unavailable" });
     }
-  });
-  app.get("/api/platform/config.js", (_req, res) => {
-    res.set("Cache-Control", "no-store").type("application/javascript").send(publicPlatformScript());
   });
   // tRPC API
   app.use(

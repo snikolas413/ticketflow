@@ -13,16 +13,6 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true as const,
   };
 
-  app.get("/manus-routes.json", async (_req, res, next) => {
-    try {
-      const routesPath = path.resolve(import.meta.dirname, "../..", "public", "manus-routes.json");
-      const routes = await fs.promises.readFile(routesPath, "utf-8");
-      res.status(200).type("application/json").send(routes);
-    } catch (error) {
-      next(error);
-    }
-  });
-
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,
