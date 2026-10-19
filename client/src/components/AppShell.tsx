@@ -60,7 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button onClick={toggleTheme} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-medium text-slate-300 transition hover:bg-white/[0.07] hover:text-white" aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}>
             {theme === "dark" ? <Sun className="size-4 text-[#ff6679]" /> : <Moon className="size-4 text-[#ff6679]" />}
             <span>{theme === "dark" ? "Modo claro" : "Modo escuro"}</span>
-            <span className="ml-auto rounded-full border border-white/10 px-2 py-0.5 text-[9px] uppercase tracking-wider text-slate-500}>{theme === "dark" ? "Dark" : "Light"}</span>
+            <span className="ml-auto rounded-full border border-white/10 px-2 py-0.5 text-[9px] uppercase tracking-wider text-slate-500">{theme === "dark" ? "Dark" : "Light"}</span>
           </button>
           <div className="flex items-center gap-3 rounded-xl px-2 py-2">
             <Avatar className="size-9 border border-white/15 bg-white/10"><AvatarFallback className="bg-[#ed1b36] text-xs font-semibold text-white">{initials}</AvatarFallback></Avatar>
