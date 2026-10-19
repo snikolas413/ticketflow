@@ -21,13 +21,13 @@ describe("current platform integration", () => {
     expect(appended).toHaveLength(0);
   });
   it("does not guess a production API when the project environment is absent", async () => {
-    vi.stubEnv("MANUS_API_URL", ""); vi.stubEnv("MANUS_API_KEY", "test-only");
+    vi.stubEnv("AI_API_URL", ""); vi.stubEnv("AI_API_KEY", "test-only");
     const request = vi.fn(); vi.stubGlobal("fetch", request);
-    await expect(listLLMModels()).rejects.toThrow("MANUS_API_URL");
+    await expect(listLLMModels()).rejects.toThrow("AI_API_URL");
     expect(request).not.toHaveBeenCalled();
   });
   it("persists URL-only image results through current managed storage", async () => {
-    vi.stubEnv("MANUS_API_URL", "https://api.example"); vi.stubEnv("MANUS_API_KEY", "test-only");
+    vi.stubEnv("PLATFORM_API_URL", "https://api.example"); vi.stubEnv("PLATFORM_API_KEY", "test-only"); vi.stubEnv("SUPABASE_URL", "https://storage.example"); vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "storage-test-only"); vi.stubEnv("SUPABASE_STORAGE_BUCKET", "ticket-attachments");
     const request = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ image: { url: "https://image.example/result.png", mimeType: "image/png" } })))
       .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3])))
@@ -35,8 +35,8 @@ describe("current platform integration", () => {
       .mockResolvedValueOnce(new Response(""));
     vi.stubGlobal("fetch", request);
     const image = await generateImage({ prompt: "test", originalImages: [] });
-    expect(image.url).toMatch(/^\/manus-storage\/generated\//);
-    expect(request).toHaveBeenCalledTimes(4);
+    expect(image.url).toMatch(/^supabase-storage:\/\/ticket-attachments\/generated\//);
+    expect(request).toHaveBeenCalledTimes(3);
     expect(JSON.parse(request.mock.calls[0][1].body)).toHaveProperty("originalImages");
   });
   it("uses a distinct secure app cookie behind the HTTPS Preview proxy", () => {

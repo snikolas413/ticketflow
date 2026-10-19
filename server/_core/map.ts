@@ -19,12 +19,12 @@ type MapsConfig = {
 };
 
 function getMapsConfig(): MapsConfig {
-  const baseUrl = ENV.forgeApiUrl;
-  const apiKey = ENV.forgeApiKey;
+  const baseUrl = ENV.platformApiUrl;
+  const apiKey = ENV.platformApiKey;
 
   if (!baseUrl || !apiKey) {
     throw new Error(
-      "Google Maps proxy credentials missing: set MANUS_API_URL and MANUS_API_KEY"
+      "Google Maps proxy credentials missing: set PLATFORM_API_URL and PLATFORM_API_KEY"
     );
   }
 

@@ -19,6 +19,14 @@ services:
         sync: false
       - key: SUPABASE_STORAGE_BUCKET
         value: ticket-attachments
+      - key: AI_API_URL
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: PLATFORM_API_URL
+        sync: false
+      - key: PLATFORM_API_KEY
+        sync: false
       - key: MANUS_PROJECT_ID
         value: ticketflow-production
       - key: MANUS_JWT_SECRET

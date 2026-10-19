@@ -455,7 +455,8 @@ export async function listTickets(user: User, filters: TicketFilters = {}) {
 
   const clauses = [];
   const access = await managerScopePredicate(user);
-  const approvalRows = await db.select({ ticketId: ticketApprovals.ticketId }).from(ticketApprovals).where(or(eq(ticketApprovals.approverId, user.id), eq(ticketApprovals.requestedById, user.id)));
+  // Administrators must see every ticket, not only tickets linked to an approval.
+  const approvalRows = user.role === "admin" ? [] : await db.select({ ticketId: ticketApprovals.ticketId }).from(ticketApprovals).where(or(eq(ticketApprovals.approverId, user.id), eq(ticketApprovals.requestedById, user.id)));
   const approvalAccess = approvalRows.map(row => eq(tickets.id, row.ticketId));
   if (access && approvalAccess.length) clauses.push(or(access, ...approvalAccess)!);
   else if (access) clauses.push(access);
