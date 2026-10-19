@@ -225,6 +225,38 @@ export default function Home() {
     };
   }, [allRows, effectiveUser?.id]);
 
+  // SLA health summary for the management dashboard. Only active deadlines are counted.
+  const slaSummary = useMemo(() => {
+    let overdue = 0;
+    let atRisk = 0;
+    let onTrack = 0;
+    let monitored = 0;
+
+    for (const ticket of allRows) {
+      if (ticket.status === "resolved" || ticket.status === "closed") continue;
+      const policy = slaPolicies.data?.find((item) => item.priority === ticket.priority);
+      if (!policy) continue;
+      const sla = calculateTicketSla({
+        createdAt: ticket.createdAt,
+        status: ticket.status,
+        priority: ticket.priority,
+        policy,
+        firstRespondedAt: ticket.firstRespondedAt,
+      });
+      if (!sla) continue;
+
+      for (const deadline of [sla.firstResponse, sla.resolution]) {
+        if (!deadline) continue;
+        monitored += 1;
+        if (deadline.state === "breached") overdue += 1;
+        else if (deadline.state === "at_risk") atRisk += 1;
+        else if (deadline.state === "on_track") onTrack += 1;
+      }
+    }
+
+    return { overdue, atRisk, onTrack, monitored };
+  }, [allRows, slaPolicies.data]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f6f7fb]">
@@ -383,6 +415,41 @@ export default function Home() {
                 badge={`${metrics.resolutionRate}%`}
               />
             </div>
+
+            {/* SLA health summary */}
+            <Card className="border-[#e5e8f0] shadow-sm">
+              <CardHeader className="border-b border-[#edf0f5] pb-4">
+                <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                  <div>
+                    <CardTitle className="text-base text-[#15213d]">Saúde dos SLAs</CardTitle>
+                    <p className="mt-1 text-xs text-[#8791a5]">Prazos ativos de primeira resposta e resolução</p>
+                  </div>
+                  <Badge variant="outline" className="w-fit border-[#d5ddf0] text-[#526079]">
+                    {slaSummary.monitored} prazos monitorados
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-3 p-4 sm:grid-cols-3">
+                <div className="rounded-xl border border-red-100 bg-red-50/70 p-4">
+                  <p className="text-xs font-medium text-red-700">Vencidos</p>
+                  <p className="mt-1 text-2xl font-bold text-red-700">{slaSummary.overdue}</p>
+                  <p className="mt-1 text-[11px] text-red-600">Exigem ação prioritária</p>
+                </div>
+                <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-4">
+                  <p className="text-xs font-medium text-amber-800">Em risco</p>
+                  <p className="mt-1 text-2xl font-bold text-amber-800">{slaSummary.atRisk}</p>
+                  <p className="mt-1 text-[11px] text-amber-700">Vencem em até 1 hora</p>
+                </div>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+                  <p className="text-xs font-medium text-emerald-800">Dentro do prazo</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-800">{slaSummary.onTrack}</p>
+                  <p className="mt-1 text-[11px] text-emerald-700">Prazos sem risco imediato</p>
+                </div>
+              </CardContent>
+              <div className="px-4 pb-4 text-[11px] text-[#8791a5]">
+                Cálculo atual em horas corridas, conforme as políticas configuradas por prioridade.
+              </div>
+            </Card>
 
             {/* Analytical Insights Row */}
             <div className="grid gap-6 lg:grid-cols-3">
