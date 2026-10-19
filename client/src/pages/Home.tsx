@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getTicketAge } from "@shared/ticket-age";
+import { calculateTicketSla } from "@shared/sla";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -134,6 +135,7 @@ export default function Home() {
   const ticketTypes = trpc.catalog.ticketTypes.useQuery(undefined, { enabled: Boolean(user), staleTime: 60_000 });
   const categories = trpc.catalog.categories.useQuery(undefined, { enabled: Boolean(user), staleTime: 60_000 });
   const services = trpc.catalog.services.useQuery({ categoryId }, { enabled: Boolean(user), staleTime: 60_000 });
+  const slaPolicies = trpc.tickets.slaPolicies.useQuery(undefined, { enabled: Boolean(user), staleTime: 60_000 });
 
   // Query for general tickets (overview & all tickets)
   const allTicketsQuery = trpc.tickets.list.useQuery(
@@ -823,6 +825,41 @@ export default function Home() {
                               1ª resposta registrada em {new Date(ticket.firstRespondedAt).toLocaleString("pt-BR")}
                             </p>
                           )}
+                          {(() => {
+                            const policy = slaPolicies.data?.find((item) => item.priority === ticket.priority);
+                            if (!policy) return null;
+                            const sla = calculateTicketSla({
+                              createdAt: ticket.createdAt,
+                              status: ticket.status,
+                              priority: ticket.priority,
+                              policy,
+                              firstRespondedAt: ticket.firstRespondedAt,
+                            });
+                            if (!sla) return null;
+                            const deadlines = [
+                              { label: "1ª resposta", deadline: sla.firstResponse },
+                              { label: "Resolução", deadline: sla.resolution },
+                            ].filter((item) => item.deadline !== null);
+                            if (deadlines.length === 0) return null;
+                            return (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {deadlines.map(({ label, deadline }) => {
+                                  if (!deadline) return null;
+                                  const text = deadline.state === "breached"
+                                    ? "Vencido"
+                                    : deadline.state === "at_risk"
+                                    ? "Em risco"
+                                    : `Em dia · ${Math.ceil(deadline.remainingMs / 3_600_000)}h restantes`;
+                                  const tone = deadline.state === "breached"
+                                    ? "border-red-200 bg-red-50 text-red-700"
+                                    : deadline.state === "at_risk"
+                                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                                    : "border-emerald-200 bg-emerald-50 text-emerald-700";
+                                  return <Badge key={label} variant="outline" className={`text-[10px] ${tone}`}>{label}: {text}</Badge>;
+                                })}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <ChevronRight className="size-4 text-[#b5bdcb] transition-transform group-hover:translate-x-1 group-hover:text-[#3157d5]" />
                       </button>
@@ -953,6 +990,41 @@ export default function Home() {
                               1ª resposta registrada em {new Date(ticket.firstRespondedAt).toLocaleString("pt-BR")}
                             </p>
                           )}
+                          {(() => {
+                            const policy = slaPolicies.data?.find((item) => item.priority === ticket.priority);
+                            if (!policy) return null;
+                            const sla = calculateTicketSla({
+                              createdAt: ticket.createdAt,
+                              status: ticket.status,
+                              priority: ticket.priority,
+                              policy,
+                              firstRespondedAt: ticket.firstRespondedAt,
+                            });
+                            if (!sla) return null;
+                            const deadlines = [
+                              { label: "1ª resposta", deadline: sla.firstResponse },
+                              { label: "Resolução", deadline: sla.resolution },
+                            ].filter((item) => item.deadline !== null);
+                            if (deadlines.length === 0) return null;
+                            return (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {deadlines.map(({ label, deadline }) => {
+                                  if (!deadline) return null;
+                                  const text = deadline.state === "breached"
+                                    ? "Vencido"
+                                    : deadline.state === "at_risk"
+                                    ? "Em risco"
+                                    : `Em dia · ${Math.ceil(deadline.remainingMs / 3_600_000)}h restantes`;
+                                  const tone = deadline.state === "breached"
+                                    ? "border-red-200 bg-red-50 text-red-700"
+                                    : deadline.state === "at_risk"
+                                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                                    : "border-emerald-200 bg-emerald-50 text-emerald-700";
+                                  return <Badge key={label} variant="outline" className={`text-[10px] ${tone}`}>{label}: {text}</Badge>;
+                                })}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <ChevronRight className="size-4 text-[#b5bdcb] transition-transform group-hover:translate-x-1 group-hover:text-[#3157d5]" />
                       </button>
