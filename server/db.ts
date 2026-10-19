@@ -731,6 +731,11 @@ export async function addComment(input: { user: User; ticketId: number; body: st
     visibility: input.visibility,
   }).returning({ id: ticketComments.id });
   await addEvent(input.ticketId, input.user.id, input.visibility === "internal" ? "comment.internal" : "comment.public", { commentId: createdComment.id });
+  const isStaffResponse = input.user.role === "admin" || ["agent", "approver", "manager"].includes(input.user.profile);
+  if (input.visibility === "public" && isStaffResponse) {
+    await db.update(tickets).set({ firstRespondedAt: new Date() })
+      .where(and(eq(tickets.id, input.ticketId), isNull(tickets.firstRespondedAt)));
+  }
   if (input.attachments?.length) await saveAttachments({ user: input.user, ticketId: input.ticketId, commentId: createdComment.id, attachments: input.attachments });
   return db.select().from(ticketComments).where(eq(ticketComments.id, createdComment.id)).limit(1).then(rows => rows[0]);
 }
