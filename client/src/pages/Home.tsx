@@ -524,31 +524,53 @@ export default function Home() {
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
+                <CardContent className="space-y-4 p-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3">
+                      <p className="text-xs font-medium text-amber-800">Sem responsável</p>
+                      <p className="mt-1 text-2xl font-bold text-amber-800">{assigneeWorkload.unassigned}</p>
+                      <p className="mt-1 text-[11px] text-amber-700">Chamados ativos que precisam de triagem</p>
+                    </div>
+                    <div className="rounded-xl border border-[#e5e8f0] bg-[#f8f9fc] p-3">
+                      <p className="text-xs font-medium text-[#6c7891]">Ativos atribuídos</p>
+                      <p className="mt-1 text-2xl font-bold text-[#15213d]">
+                        {assigneeWorkload.workload.reduce((sum, person) => sum + person.active, 0)}
+                      </p>
+                      <p className="mt-1 text-[11px] text-[#6c7891]">Carga de trabalho em aberto</p>
+                    </div>
+                  </div>
                   {adminUsers.isLoading ? (
                     <p className="p-5 text-sm text-[#8791a5]">Carregando responsáveis...</p>
                   ) : assigneeWorkload.workload.length === 0 ? (
                     <p className="p-5 text-sm text-[#8791a5]">Ainda não há chamados atribuídos a responsáveis.</p>
                   ) : (
                     <div className="divide-y divide-[#edf0f5]">
-                      {assigneeWorkload.workload.slice(0, 8).map((person) => (
-                        <div key={person.id} className="flex items-center justify-between gap-4 px-5 py-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-[#15213d]">{person.name}</p>
-                            <p className="mt-0.5 text-xs text-[#8791a5]">{person.completed} concluído(s)</p>
+                      {assigneeWorkload.workload.slice(0, 8).map((person) => {
+                        const maxActive = Math.max(1, ...assigneeWorkload.workload.map((item) => item.active));
+                        const workloadPercent = Math.round((person.active / maxActive) * 100);
+                        return (
+                          <div key={person.id} className="space-y-2 py-3">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-[#15213d]">{person.name}</p>
+                                <p className="mt-0.5 text-xs text-[#8791a5]">{person.completed} concluído(s) no histórico carregado</p>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <p className="text-lg font-semibold text-[#15213d]">{person.active}</p>
+                                <p className="text-[11px] text-[#6c7891]">ativo(s)</p>
+                              </div>
+                            </div>
+                            <div className="h-1.5 overflow-hidden rounded-full bg-[#edf0f5]">
+                              <div className="h-full rounded-full bg-[#3157d5]" style={{ width: `${workloadPercent}%` }} />
+                            </div>
                           </div>
-                          <div className="shrink-0 text-right">
-                            <p className="text-lg font-semibold text-[#15213d]">{person.active}</p>
-                            <p className="text-[11px] text-[#6c7891]">ativo(s)</p>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
-                  <div className="border-t border-[#edf0f5] bg-[#f8f9fc] px-5 py-3 text-xs text-[#6c7891]">
-                    Sem responsável: <strong className="text-[#15213d]">{assigneeWorkload.unassigned}</strong> chamado(s) ativo(s).
-                    <span className="ml-1">Exibe até 8 responsáveis, ordenados pela maior fila ativa.</span>
-                  </div>
+                  <p className="text-[11px] leading-relaxed text-[#8791a5]">
+                    Comparação relativa entre responsáveis exibidos. A carga não considera complexidade, horas trabalhadas ou capacidade individual.
+                  </p>
                 </CardContent>
               </Card>
             )}
