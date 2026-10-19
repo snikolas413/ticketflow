@@ -15,6 +15,7 @@ import {
   managerScopes,
   serviceCategories,
   services,
+  slaPolicies,
   ticketApprovals,
   teams,
   ticketAttachments,
@@ -914,3 +915,25 @@ export async function clearCatalogAndTickets(admin: User) {
 
   return { success: true };
 }
+
+export async function listSlaPolicies() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  return db.select().from(slaPolicies).orderBy(slaPolicies.priority);
+}
+
+export async function updateSlaPolicy(input: { actorId: number; priority: string; firstResponseHours: number; resolutionHours: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const [policy] = await db.insert(slaPolicies).values({
+    priority: input.priority,
+    firstResponseHours: input.firstResponseHours,
+    resolutionHours: input.resolutionHours,
+  }).onConflictDoUpdate({
+    target: slaPolicies.priority,
+    set: { firstResponseHours: input.firstResponseHours, resolutionHours: input.resolutionHours, updatedAt: new Date() },
+  }).returning();
+  await recordAudit({ actorId: input.actorId, action: "sla.policy_updated", resource: "sla_policy", payload: { priority: input.priority, firstResponseHours: input.firstResponseHours, resolutionHours: input.resolutionHours } });
+  return policy;
+}
+
