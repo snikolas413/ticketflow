@@ -818,6 +818,11 @@ export default function Home() {
                             const toneClass = age.tone === "critical" ? "text-red-600" : age.tone === "warning" ? "text-amber-600" : "text-[#8791a5]";
                             return <p className={`mt-1 text-[11px] font-medium ${toneClass}`}>{age.label}</p>;
                           })()}
+                          {ticket.firstRespondedAt && (
+                            <p className="mt-1 text-[11px] font-medium text-emerald-700">
+                              1ª resposta registrada em {new Date(ticket.firstRespondedAt).toLocaleString("pt-BR")}
+                            </p>
+                          )}
                         </div>
                         <ChevronRight className="size-4 text-[#b5bdcb] transition-transform group-hover:translate-x-1 group-hover:text-[#3157d5]" />
                       </button>
@@ -943,6 +948,11 @@ export default function Home() {
                             Atualizado em {new Date(ticket.updatedAt).toLocaleDateString("pt-BR")}
                             {ticket.assigneeId ? ` · Responsável #${ticket.assigneeId}` : " · Sem responsável atribuído"}
                           </p>
+                          {ticket.firstRespondedAt && (
+                            <p className="mt-1 text-[11px] font-medium text-emerald-700">
+                              1ª resposta registrada em {new Date(ticket.firstRespondedAt).toLocaleString("pt-BR")}
+                            </p>
+                          )}
                         </div>
                         <ChevronRight className="size-4 text-[#b5bdcb] transition-transform group-hover:translate-x-1 group-hover:text-[#3157d5]" />
                       </button>
