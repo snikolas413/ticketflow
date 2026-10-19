@@ -29,6 +29,13 @@
       "when": 1792422300000,
       "tag": "0003_track_first_response",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792425000000,
+      "tag": "0004_sla_policies",
+      "breakpoints": true
     }
   ]
 }
