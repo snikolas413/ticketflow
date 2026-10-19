@@ -43,17 +43,17 @@ export type GenerateImageResponse = {
 export async function generateImage(
   options: GenerateImageOptions
 ): Promise<GenerateImageResponse> {
-  if (!ENV.forgeApiUrl) {
-    throw new Error("MANUS_API_URL is not configured");
+  if (!ENV.platformApiUrl) {
+    throw new Error("PLATFORM_API_URL is not configured");
   }
-  if (!ENV.forgeApiKey) {
-    throw new Error("MANUS_API_KEY is not configured");
+  if (!ENV.platformApiKey) {
+    throw new Error("PLATFORM_API_KEY is not configured");
   }
 
   // Build the full URL by appending the service path to the base URL
-  const baseUrl = ENV.forgeApiUrl.endsWith("/")
-    ? ENV.forgeApiUrl
-    : `${ENV.forgeApiUrl}/`;
+  const baseUrl = ENV.platformApiUrl.endsWith("/")
+    ? ENV.platformApiUrl
+    : `${ENV.platformApiUrl}/`;
   const fullUrl = new URL(
     "images.v1.ImageService/GenerateImage",
     baseUrl
@@ -69,7 +69,7 @@ export async function generateImage(
       accept: "application/json",
       "content-type": "application/json",
       "connect-protocol-version": "1",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${ENV.platformApiKey}`,
     },
     body: JSON.stringify({
       prompt: options.prompt,
@@ -129,16 +129,16 @@ export type ListImageModelsResponse = {
  * Feed a returned `model` value into generateImage({ model }).
  */
 export async function listImageModels(): Promise<ListImageModelsResponse> {
-  if (!ENV.forgeApiUrl) {
-    throw new Error("MANUS_API_URL is not configured");
+  if (!ENV.platformApiUrl) {
+    throw new Error("PLATFORM_API_URL is not configured");
   }
-  if (!ENV.forgeApiKey) {
-    throw new Error("MANUS_API_KEY is not configured");
+  if (!ENV.platformApiKey) {
+    throw new Error("PLATFORM_API_KEY is not configured");
   }
 
-  const baseUrl = ENV.forgeApiUrl.endsWith("/")
-    ? ENV.forgeApiUrl
-    : `${ENV.forgeApiUrl}/`;
+  const baseUrl = ENV.platformApiUrl.endsWith("/")
+    ? ENV.platformApiUrl
+    : `${ENV.platformApiUrl}/`;
   const fullUrl = new URL(
     "images.v1.ImageService/ListModels",
     baseUrl
@@ -150,7 +150,7 @@ export async function listImageModels(): Promise<ListImageModelsResponse> {
       accept: "application/json",
       "content-type": "application/json",
       "connect-protocol-version": "1",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${ENV.platformApiKey}`,
     },
     body: "{}",
   });
