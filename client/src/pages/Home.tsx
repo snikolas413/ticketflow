@@ -225,6 +225,24 @@ export default function Home() {
     };
   }, [allRows, effectiveUser?.id]);
 
+  // Resolution-time KPI uses only completed tickets with a valid resolvedAt timestamp.
+  // This avoids treating updatedAt or closedAt as a resolution timestamp.
+  const resolutionInsights = useMemo(() => {
+    const completedWithResolution = allRows.filter((ticket) => {
+      if (ticket.status !== "resolved" && ticket.status !== "closed") return false;
+      if (!ticket.resolvedAt) return false;
+      const createdMs = new Date(ticket.createdAt).getTime();
+      const resolvedMs = new Date(ticket.resolvedAt).getTime();
+      return Number.isFinite(createdMs) && Number.isFinite(resolvedMs) && resolvedMs >= createdMs;
+    });
+    const totalResolutionMs = completedWithResolution.reduce((sum, ticket) =>
+      sum + (new Date(ticket.resolvedAt!).getTime() - new Date(ticket.createdAt).getTime()), 0);
+    const averageHours = completedWithResolution.length > 0
+      ? totalResolutionMs / completedWithResolution.length / 3_600_000
+      : null;
+    return { sampleSize: completedWithResolution.length, averageHours };
+  }, [allRows]);
+
   // SLA health summary for the management dashboard. Only active deadlines are counted.
   const slaSummary = useMemo(() => {
     let overdue = 0;
@@ -449,6 +467,31 @@ export default function Home() {
               <div className="px-4 pb-4 text-[11px] text-[#8791a5]">
                 Cálculo atual em horas corridas, conforme as políticas configuradas por prioridade.
               </div>
+            </Card>
+
+            {/* Resolution performance KPI */}
+            <Card className="border-[#e5e8f0] shadow-sm">
+              <CardHeader className="border-b border-[#edf0f5] pb-3">
+                <CardTitle className="text-base text-[#15213d]">Tempo médio de resolução</CardTitle>
+                <p className="text-xs text-[#8791a5]">Tempo entre a abertura e a resolução registrada</p>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2 p-5 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-3xl font-bold tracking-tight text-[#15213d]">
+                    {resolutionInsights.averageHours === null
+                      ? "Sem dados"
+                      : resolutionInsights.averageHours < 24
+                        ? `${resolutionInsights.averageHours.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h`
+                        : `${(resolutionInsights.averageHours / 24).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} dias`}
+                  </p>
+                  <p className="mt-1 text-xs text-[#6c7891]">
+                    Base: {resolutionInsights.sampleSize} chamado(s) concluído(s) com data de resolução registrada.
+                  </p>
+                </div>
+                <Badge variant="outline" className="w-fit border-[#d5ddf0] text-[#526079]">
+                  Métrica histórica
+                </Badge>
+              </CardContent>
             </Card>
 
             {/* Analytical Insights Row */}
