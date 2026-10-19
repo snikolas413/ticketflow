@@ -11,3 +11,4 @@ VALUES
   ('high', 4, 24),
   ('urgent', 1, 8)
 ON CONFLICT ("priority") DO NOTHING;
+ALTER TABLE "public"."slaPolicies" ENABLE ROW LEVEL SECURITY;
