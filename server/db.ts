@@ -424,6 +424,29 @@ export async function createService(input: { name: string; code: string; descrip
   return (await db.select().from(services).where(eq(services.code, code)).limit(1))[0];
 }
 
+export async function updateServiceRouting(admin: User, input: { serviceId: number; defaultTicketTypeId: number | null; defaultQueueId: number | null }) {
+  if (admin.role !== "admin") throw new Error("Only administrators can configure service routing");
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const service = (await db.select().from(services).where(eq(services.id, input.serviceId)).limit(1))[0];
+  if (!service) throw new Error("Serviço não encontrado");
+  if (input.defaultTicketTypeId !== null) {
+    const type = (await db.select().from(ticketTypes).where(and(eq(ticketTypes.id, input.defaultTicketTypeId), eq(ticketTypes.active, 1))).limit(1))[0];
+    if (!type) throw new Error("Tipo padrão não encontrado ou inativo");
+  }
+  if (input.defaultQueueId !== null) {
+    const queue = (await db.select().from(queues).where(and(eq(queues.id, input.defaultQueueId), eq(queues.active, 1))).limit(1))[0];
+    if (!queue) throw new Error("Fila padrão não encontrada ou inativa");
+  }
+  await db.update(services).set({
+    defaultTicketTypeId: input.defaultTicketTypeId,
+    defaultQueueId: input.defaultQueueId,
+    updatedAt: new Date(),
+  }).where(eq(services.id, input.serviceId));
+  await recordAudit({ actorId: admin.id, action: "catalog.service_routing_updated", resource: "service", payload: { serviceId: input.serviceId, defaultTicketTypeId: input.defaultTicketTypeId, defaultQueueId: input.defaultQueueId } });
+  return (await db.select().from(services).where(eq(services.id, input.serviceId)).limit(1))[0];
+}
+
 export type TicketFilters = {
   search?: string;
   status?: TicketStatus;
