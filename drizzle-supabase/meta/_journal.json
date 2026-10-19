@@ -22,6 +22,13 @@
       "when": 1792416600000,
       "tag": "0002_enable_public_table_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792422300000,
+      "tag": "0003_track_first_response",
+      "breakpoints": true
     }
   ]
 }
