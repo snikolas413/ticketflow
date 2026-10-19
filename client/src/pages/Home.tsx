@@ -55,6 +55,18 @@ const priorityBg: Record<TicketPriority, string> = {
   low: "bg-slate-400",
 };
 
+function getTicketAgeLabel(createdAt: Date | string, status: TicketStatus): string | null {
+  if (status === "resolved" || status === "closed") return null;
+  const created = new Date(createdAt).getTime();
+  if (!Number.isFinite(created)) return null;
+  const elapsedHours = Math.max(0, Math.floor((Date.now() - created) / 3_600_000));
+  if (elapsedHours < 1) return "Aberto há menos de 1h";
+  if (elapsedHours < 24) return `Aberto há ${elapsedHours}h`;
+  const days = Math.floor(elapsedHours / 24);
+  const remainingHours = elapsedHours % 24;
+  return remainingHours ? `Aberto há ${days}d ${remainingHours}h` : `Aberto há ${days}d`;
+}
+
 type PendingAttachment = { fileName: string; contentType: string; fileSize: number; data: string };
 
 function readAttachment(file: File): Promise<PendingAttachment> {
@@ -809,6 +821,11 @@ export default function Home() {
                             Atualizado em {new Date(ticket.updatedAt).toLocaleDateString("pt-BR")} · Criado em{" "}
                             {new Date(ticket.createdAt).toLocaleDateString("pt-BR")}
                           </p>
+                          {getTicketAgeLabel(ticket.createdAt, ticket.status) && (
+                            <p className={`mt-1 text-[11px] font-medium ${new Date(ticket.createdAt).getTime() < Date.now() - 72 * 60 * 60 * 1000 ? "text-red-600" : new Date(ticket.createdAt).getTime() < Date.now() - 24 * 60 * 60 * 1000 ? "text-amber-600" : "text-[#8791a5]"}`}>
+                              {getTicketAgeLabel(ticket.createdAt, ticket.status)}
+                            </p>
+                          )}
                         </div>
                         <ChevronRight className="size-4 text-[#b5bdcb] transition-transform group-hover:translate-x-1 group-hover:text-[#3157d5]" />
                       </button>
