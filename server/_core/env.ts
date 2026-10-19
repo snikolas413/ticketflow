@@ -6,6 +6,8 @@ export const ENV = {
   // Optional OpenAI-compatible provider for AI assistance. No Manus endpoint is used.
   get aiApiUrl() { return process.env.AI_API_URL ?? ""; },
   get aiApiKey() { return process.env.AI_API_KEY ?? ""; },
+  get platformApiUrl() { return process.env.PLATFORM_API_URL ?? ""; },
+  get platformApiKey() { return process.env.PLATFORM_API_KEY ?? ""; },
   // Preserve the legacy hint when supplied; otherwise roles remain application data.
   get ownerOpenId() { return process.env.OWNER_OPEN_ID ?? ""; },
   get isProduction() { return process.env.NODE_ENV === "production"; },
