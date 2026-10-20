@@ -524,7 +524,7 @@ export async function getTicketForUser(user: User, ticketId: number) {
 }
 
 export function canUserClaimTickets(user: Pick<User, "role" | "profile">) {
-  return user.role === "admin" || user.profile === "agent" || user.profile === "manager";
+  return user.role === "admin" || user.profile === "agent" || user.profile === "approver" || user.profile === "manager";
 }
 
 export function isUserInTicketArea(
@@ -795,7 +795,7 @@ export async function assignTicket(input: { user: User; ticketId: number; assign
   if (input.assigneeId) {
     const assignee = (await db.select().from(users).where(and(eq(users.id, input.assigneeId), eq(users.active, 1))).limit(1))[0];
     if (!assignee) throw new Error("Responsável não encontrado ou inativo");
-    if (assignee.role !== "admin" && !["agent", "manager"].includes(assignee.profile)) throw new Error("O responsável precisa ter perfil de atendente ou gestor");
+    if (assignee.role !== "admin" && !["agent", "approver", "manager"].includes(assignee.profile)) throw new Error("O responsável precisa ter perfil de atendente, aprovador ou gestor");
     if (assignee.role !== "admin" && !(assignee.teamId ? assignee.teamId === ticket.teamId : assignee.departmentId === ticket.departmentId)) throw new Error("O responsável não pertence à área do chamado");
   }
   await db.update(tickets).set({ assigneeId: input.assigneeId, updatedAt: new Date() }).where(eq(tickets.id, input.ticketId));
@@ -807,7 +807,7 @@ export async function assignTicket(input: { user: User; ticketId: number; assign
 export async function claimTicket(input: { user: User; ticketId: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  if (!canUserClaimTickets(input.user)) throw new Error("Somente atendentes, gestores ou administradores podem assumir chamados");
+  if (!canUserClaimTickets(input.user)) throw new Error("Somente atendentes, aprovadores, gestores ou administradores podem assumir chamados");
   const ticket = await getTicketForUser(input.user, input.ticketId);
   if (!ticket) throw new Error("Ticket not found or not accessible");
   if (ticket.approvalStatus !== "approved") throw new Error("O chamado ainda aguarda validação do aprovador");
