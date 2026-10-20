@@ -741,9 +741,9 @@ export async function addComment(input: { user: User; ticketId: number; body: st
 }
 
 const ALLOWED_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
-  open: ["in_progress", "closed"],
-  in_progress: ["waiting_requester", "resolved", "open"],
-  waiting_requester: ["in_progress", "resolved"],
+  open: ["in_progress"],
+  in_progress: ["resolved"],
+  waiting_requester: ["in_progress"],
   resolved: ["closed", "in_progress"],
   closed: ["open"],
 };
@@ -757,14 +757,22 @@ export async function transitionTicket(input: { user: User; ticketId: number; st
   if (!db) throw new Error("Database is not available");
   const ticket = await getTicketForUser(input.user, input.ticketId);
   if (!ticket) throw new Error("Ticket not found or not accessible");
-  if (input.user.role !== "admin" && ticket.approvalStatus !== "approved") throw new Error("O chamado precisa ser validado pelo aprovador da área antes do atendimento");
-  if (input.user.role !== "admin" && input.user.profile === "requester") {
-    await recordAudit({ actorId: input.user.id, ticketId: input.ticketId, action: "ticket.transition_denied", resource: "ticket", payload: { reason: "requester_profile", requestedStatus: input.status } });
-    throw new Error("You do not have permission to transition this ticket");
-  }
-  if (input.user.role !== "admin" && input.user.profile !== "manager" && ticket.assigneeId !== input.user.id) {
+  const isRequester = input.user.role !== "admin" && input.user.profile === "requester";
+  if (isRequester) {
+    if (ticket.requesterId !== input.user.id || ticket.status !== "resolved" || !["closed", "in_progress"].includes(input.status)) {
+      await recordAudit({ actorId: input.user.id, ticketId: input.ticketId, action: "ticket.transition_denied", resource: "ticket", payload: { reason: "requester_validation_only", requestedStatus: input.status } });
+      throw new Error("O solicitante só pode encerrar ou reabrir o próprio chamado após a resolução");
+    }
+  } else {
+    if (input.user.role !== "admin" && ticket.approvalStatus !== "approved") throw new Error("O chamado precisa ser validado pelo aprovador da área antes do atendimento");
+    if (input.user.role !== "admin" && input.user.profile !== "manager" && ticket.assigneeId !== input.user.id) {
     await recordAudit({ actorId: input.user.id, ticketId: input.ticketId, action: "ticket.transition_denied", resource: "ticket", payload: { reason: "not_assignee", requestedStatus: input.status } });
     throw new Error("Somente o atendente atribuído pode alterar este chamado");
+    }
+    if (input.status !== "resolved") {
+      await recordAudit({ actorId: input.user.id, ticketId: input.ticketId, action: "ticket.transition_denied", resource: "ticket", payload: { reason: "attendant_can_only_resolve", requestedStatus: input.status } });
+      throw new Error("O atendente só pode marcar o chamado como resolvido; o solicitante valida o encerramento");
+    }
   }
   if (!ALLOWED_TRANSITIONS[ticket.status].includes(input.status)) {
     await recordAudit({ actorId: input.user.id, ticketId: input.ticketId, action: "ticket.invalid_transition", resource: "ticket", payload: { from: ticket.status, to: input.status } });
