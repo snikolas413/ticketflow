@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
-import { Bell, ClipboardList, Inbox, LayoutDashboard, LogOut, Menu, Moon, Settings2, Sun, X } from "lucide-react";
+import { BarChart3, Bell, ClipboardList, Inbox, LayoutDashboard, LogOut, Menu, Moon, Settings2, Sun, X } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 
@@ -12,6 +12,7 @@ const navItems = [
   { label: "Visão geral", icon: LayoutDashboard, path: "/" },
   { label: "Meus chamados", icon: ClipboardList, path: "/my-tickets" },
   { label: "Fila geral", icon: Inbox, path: "/tickets" },
+  { label: "KPIs", icon: BarChart3, path: "/kpis" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -28,6 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const initials = (currentUser?.name || currentUser?.email || "U").slice(0, 2).toUpperCase();
   const activeDetail = location.startsWith("/tickets/");
   const activeAdmin = location.startsWith("/admin");
+  const activeKpis = location.startsWith("/kpis");
 
   return (
     <div className="min-h-screen bg-[var(--app-background)] text-[var(--app-foreground)] transition-colors">
@@ -64,14 +66,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--app-border)] bg-[var(--app-background)]/90 px-5 py-3 backdrop-blur-xl sm:px-8">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Abrir menu"><Menu className="size-5" /></Button>
-            <div className="hidden sm:block"><p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#ed1b36]">FULLBRANDS · OPERAÇÕES</p><p className="mt-0.5 text-sm font-semibold text-[var(--app-foreground)]">{activeAdmin ? "Configuração" : activeDetail ? "Detalhes do chamado" : navItems.find(item => item.path === location)?.label ?? "TicketFlow"}</p></div>
-            <span className="sm:hidden text-sm font-bold">Ticket<span className="text-[#ed1b36]">Flow</span></span>
+            <div className="hidden sm:block"><p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#ed1b36]">FULLBRANDS · OPERAÇÕES</p><p className="mt-0.5 text-sm font-semibold text-[var(--app-foreground)]">{activeAdmin ? "Configuração" : activeDetail ? "Detalhes do chamado" : activeKpis ? "KPIs" : navItems.find(item => item.path === location)?.label ?? "TicketFlow"}</p></div>
+            <span className="text-sm font-bold sm:hidden">Ticket<span className="text-[#ed1b36]">Flow</span></span>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" className="border-[var(--app-border)] bg-[var(--app-card)]" onClick={toggleTheme} aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}>{theme === "dark" ? <Sun className="size-4 text-[#ff6679]" /> : <Moon className="size-4" />}</Button>
             <div className="relative"><Button variant="outline" size="icon" className="relative border-[var(--app-border)] bg-[var(--app-card)]" onClick={() => setNotificationOpen(open => !open)} aria-label="Notificações"><Bell className="size-4" />{(notifications.data ?? []).some(item => !item.readAt) && <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#ed1b36]" />}</Button>
               {notificationOpen && <div className="absolute right-0 mt-2 w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-popover)] shadow-2xl"><div className="flex items-center justify-between border-b border-[var(--app-border)] px-4 py-3"><div><p className="text-sm font-semibold">Notificações</p><p className="text-[11px] text-[var(--app-muted-foreground)]">Atualizações dos seus chamados e aprovações</p></div><span className="text-[10px] font-bold uppercase tracking-wider text-[#ed1b36]">{(notifications.data ?? []).filter(item => !item.readAt).length} novas</span></div><div className="max-h-[360px] overflow-y-auto">{(notifications.data ?? []).length === 0 ? <p className="px-4 py-8 text-center text-xs text-[var(--app-muted-foreground)]">Nenhuma notificação.</p> : (notifications.data ?? []).map(item => <button key={item.id} onClick={() => { markNotificationRead.mutate({ notificationId: item.id }); if (item.ticketId) setLocation(`/tickets/${item.ticketId}`); setNotificationOpen(false); }} className={cn("block w-full border-b border-[var(--app-border)] px-4 py-3 text-left hover:bg-[var(--app-secondary)]", !item.readAt && "bg-[#ed1b36]/10")}><p className="text-xs font-semibold">{item.title}</p><p className="mt-1 text-xs leading-5 text-[var(--app-muted-foreground)]">{item.body}</p><p className="mt-1 text-[10px] text-[var(--app-muted-foreground)]">{new Date(item.createdAt).toLocaleString("pt-BR")}</p></button>)}</div></div>}
-            </div>
           </div>
         </header>
         {children}
