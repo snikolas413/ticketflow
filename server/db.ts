@@ -769,7 +769,7 @@ export async function transitionTicket(input: { user: User; ticketId: number; st
     await recordAudit({ actorId: input.user.id, ticketId: input.ticketId, action: "ticket.transition_denied", resource: "ticket", payload: { reason: "not_assignee", requestedStatus: input.status } });
     throw new Error("Somente o atendente atribuído pode alterar este chamado");
     }
-    if (input.status !== "resolved") {
+    if (input.user.role !== "admin" && input.user.profile !== "manager" && input.status !== "resolved") {
       await recordAudit({ actorId: input.user.id, ticketId: input.ticketId, action: "ticket.transition_denied", resource: "ticket", payload: { reason: "attendant_can_only_resolve", requestedStatus: input.status } });
       throw new Error("O atendente só pode marcar o chamado como resolvido; o solicitante valida o encerramento");
     }
