@@ -92,7 +92,10 @@ button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a[href], sel
   .sidebar-link { display: flex; width: 100%; align-items: center; gap: 12px; border-radius: 10px; padding: 10px 12px; color: #a0a7b4; font-size: 13px; font-weight: 500; text-align: left; transition: background .18s ease, color .18s ease; }
   .sidebar-link:hover { background: rgba(255,255,255,.06); color: white; }
   .sidebar-link-active { background: linear-gradient(100deg, rgba(237,27,54,.22), rgba(237,27,54,.06)); color: white; box-shadow: inset 3px 0 0 #ed1b36; }
-  .metric-card { border-color: var(--app-border); background: var(--app-card); box-shadow: 0 8px 28px rgba(0,0,0,.06); }
+  .metric-card { border-color: var(--app-border); background: var(--app-card); box-shadow: 0 8px 28px rgba(0,0,0,.06); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+  .metric-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--brand-red) 28%, var(--app-border)); box-shadow: 0 14px 34px rgba(0,0,0,.10); }
+  .dark .metric-card { box-shadow: 0 10px 30px rgba(0,0,0,.16); }
+  .dark .metric-card:hover { box-shadow: 0 16px 38px rgba(0,0,0,.28); }
   .metric-icon { display: flex; height: 36px; width: 36px; align-items: center; justify-content: center; border-radius: 11px; }
   .metric-blue { background: #eaf0ff; color: #3157d5; }
   .metric-amber { background: #fff4df; color: #b76a00; }
@@ -108,12 +111,21 @@ button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a[href], sel
   .priority-medium { background: #3157d5; }
   .priority-high { background: #d78d1b; }
   .priority-urgent { background: #d8555f; }
-  .field-label { display: block; color: var(--app-muted-foreground); font-size: 12px; font-weight: 700; }
+  .field-label { display: block; margin-bottom: 6px; color: var(--app-muted-foreground); font-size: 11px; font-weight: 750; letter-spacing: .035em; }
+  .sidebar-link:focus-visible, button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--brand-red); outline-offset: 3px; }
+  .dark input, .dark textarea, .dark select { color-scheme: dark; }
+  ::selection { background: color-mix(in srgb, var(--brand-red) 24%, transparent); color: var(--app-foreground); }
+  * { scrollbar-color: var(--app-border) transparent; scrollbar-width: thin; }
+  *::-webkit-scrollbar { width: 8px; height: 8px; }
+  *::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: var(--app-border); background-clip: padding-box; }
+  *::-webkit-scrollbar-thumb:hover { background: var(--app-muted-foreground); background-clip: padding-box; }
   .skeleton-line { height: 12px; border-radius: 999px; background: linear-gradient(90deg, var(--app-border) 25%, var(--app-muted) 50%, var(--app-border) 75%); background-size: 200% 100%; animation: skeleton 1.4s infinite; }
   .timeline-item { position: relative; display: flex; gap: 12px; }
   .timeline-item:not(:last-child)::after { content: ""; position: absolute; left: 11px; top: 27px; bottom: -25px; width: 1px; background: var(--app-border); }
   .timeline-dot { z-index: 1; display: flex; height: 24px; width: 24px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 999px; background: #eaf0ff; color: #3157d5; }
   .timeline-dot-internal { background: #fff3df; color: #a96908; }
+  .dark .timeline-dot { background: #172846; color: #9bbaff; }
+  .dark .timeline-dot-internal { background: #332615; color: #ffc46b; }
   .dark .metric-blue { background: #172846; color: #8eb4ff; }
   .dark .metric-amber { background: #332615; color: #ffc46b; }
   .dark .metric-violet { background: #2a2040; color: #c2a8ff; }
