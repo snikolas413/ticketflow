@@ -3,8 +3,8 @@ import { allowedTransitions, canUserClaimTickets, isUserInTicketArea } from "./d
 
 describe("ticket workflow foundation", () => {
   it("allows the supported operational transitions", () => {
-    expect(allowedTransitions("open")).toEqual(["in_progress", "closed"]);
-    expect(allowedTransitions("in_progress")).toContain("resolved");
+    expect(allowedTransitions("open")).toEqual(["in_progress"]);
+    expect(allowedTransitions("in_progress")).toEqual(["resolved"]);
     expect(allowedTransitions("resolved")).toEqual(["closed", "in_progress"]);
   });
 
