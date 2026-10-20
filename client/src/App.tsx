@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Admin from "./pages/Admin";
+import KPIs from "./pages/KPIs";
 import Login from "./pages/Login";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
     <Route path="/my-tickets" component={Home} />
     <Route path="/tickets" component={Home} />
     <Route path="/tickets/:id" component={TicketDetail} />
+    <Route path="/kpis" component={KPIs} />
     <Route path="/admin" component={Admin} />
     <Route path="/404" component={NotFound} />
     <Route component={NotFound} />
