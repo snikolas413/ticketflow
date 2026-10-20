@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { authenticateLocalUser, clearCatalogAndTickets, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listUsersForAdmin, listSlaPolicies, updateSlaPolicy, localSetupStatus, markNotificationRead, replaceManagerScopes, requestApproval, setUserActive, setUserProfile, transitionTicket, updateServiceRouting } from "./db";
+import { authenticateLocalUser, clearCatalogAndTickets, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listUsersForAdmin, listSlaPolicies, updateSlaPolicy, localSetupStatus, markNotificationRead, replaceManagerScopes, setUserActive, setUserProfile, transitionTicket, updateServiceRouting } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { COOKIE_NAME } from "@shared/const";
@@ -109,7 +109,6 @@ export const appRouter = router({
   }),
   approvals: router({
     list: protectedProcedure.query(({ ctx }) => listApprovals(ctx.user)),
-    request: protectedProcedure.input(z.object({ ticketId: z.number().int().positive(), approverId: z.number().int().positive(), note: z.string().trim().max(2000).optional() })).mutation(({ ctx, input }) => requestApproval({ user: ctx.user, ...input })),
     decide: protectedProcedure.input(z.object({ approvalId: z.number().int().positive(), status: z.enum(["approved", "rejected"]), note: z.string().trim().max(2000).optional() })).mutation(({ ctx, input }) => decideApproval({ user: ctx.user, ...input })),
   }),
   tickets: router({
