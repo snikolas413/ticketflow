@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowedTransitions, isUserInTicketArea } from "./db";
+import { allowedTransitions, canUserClaimTickets, isUserInTicketArea } from "./db";
 
 describe("ticket workflow foundation", () => {
   it("allows the supported operational transitions", () => {
@@ -40,5 +40,18 @@ describe("ticket area access", () => {
   it("does not grant area access to requesters or managers through the agent rule", () => {
     expect(isUserInTicketArea({ profile: "requester", departmentId: 10, teamId: 20 }, ticket)).toBe(false);
     expect(isUserInTicketArea({ profile: "manager", departmentId: 10, teamId: 20 }, ticket)).toBe(false);
+  });
+});
+
+
+describe("ticket assignment permissions", () => {
+  it("allows attendants, managers, and administrators to claim tickets", () => {
+    expect(canUserClaimTickets({ role: "user", profile: "agent" })).toBe(true);
+    expect(canUserClaimTickets({ role: "user", profile: "manager" })).toBe(true);
+    expect(canUserClaimTickets({ role: "admin", profile: "requester" })).toBe(true);
+  });
+  it("does not allow approvers or requesters to claim tickets", () => {
+    expect(canUserClaimTickets({ role: "user", profile: "approver" })).toBe(false);
+    expect(canUserClaimTickets({ role: "user", profile: "requester" })).toBe(false);
   });
 });

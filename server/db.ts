@@ -215,11 +215,13 @@ export async function listApproverUsers() {
   return db.select({ id: users.id, name: users.name, email: users.email, departmentId: users.departmentId, teamId: users.teamId }).from(users).where(and(eq(users.active, 1), or(eq(users.role, "admin"), eq(users.profile, "approver")))).orderBy(asc(users.name));
 }
 
-export async function createUserInvitation(input: { admin: User; email: string; password: string; profile: UserProfile; departmentId?: number; teamId?: number }) {
+export async function createUserInvitation(input: { admin: User; name: string; email: string; password: string; profile: UserProfile; departmentId?: number; teamId?: number }) {
   if (input.admin.role !== "admin") throw new Error("Only administrators can create users");
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
+  const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
+  if (!name) throw new Error("Informe o nome do usuário");
   if (input.password.length < 8) throw new Error("A senha deve ter pelo menos 8 caracteres");
   if (input.profile !== "requester" && !input.departmentId) throw new Error("Atendentes, aprovadores e gestores precisam estar vinculados a um setor");
   const passwordHash = await hashPassword(input.password);
@@ -232,9 +234,9 @@ export async function createUserInvitation(input: { admin: User; email: string; 
   if (existing?.role === "admin") throw new Error("Este e-mail já pertence a um administrador");
   await db.insert(userInvitations).values({ email, passwordHash, profile: input.profile, departmentId: input.departmentId, teamId: input.teamId, invitedById: input.admin.id, active: 1 }).onConflictDoUpdate({ target: userInvitations.email, set: { passwordHash, profile: input.profile, departmentId: input.departmentId, teamId: input.teamId, invitedById: input.admin.id, active: 1 } });
   if (existing) {
-    await db.update(users).set({ name: existing.name || email, passwordHash, loginMethod: "local", profile: input.profile, departmentId: input.departmentId ?? null, teamId: input.teamId ?? null, active: 1, updatedAt: new Date() }).where(eq(users.id, existing.id));
+    await db.update(users).set({ name, passwordHash, loginMethod: "local", profile: input.profile, departmentId: input.departmentId ?? null, teamId: input.teamId ?? null, active: 1, updatedAt: new Date() }).where(eq(users.id, existing.id));
   } else {
-    await db.insert(users).values({ openId: `local:${email}`, name: email, email, passwordHash, loginMethod: "local", role: "user", profile: input.profile, departmentId: input.departmentId ?? null, teamId: input.teamId ?? null, active: 1 });
+    await db.insert(users).values({ openId: `local:${email}`, name, email, passwordHash, loginMethod: "local", role: "user", profile: input.profile, departmentId: input.departmentId ?? null, teamId: input.teamId ?? null, active: 1 });
   }
   if (input.profile === "manager" && (input.departmentId || input.teamId)) {
     const createdUser = (await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1))[0];
@@ -521,6 +523,10 @@ export async function getTicketForUser(user: User, ticketId: number) {
   return ticket;
 }
 
+export function canUserClaimTickets(user: Pick<User, "role" | "profile">) {
+  return user.role === "admin" || user.profile === "agent" || user.profile === "manager";
+}
+
 export function isUserInTicketArea(
   user: Pick<User, "profile" | "teamId" | "departmentId">,
   ticket: Pick<typeof tickets.$inferSelect, "teamId" | "departmentId">,
@@ -687,35 +693,28 @@ export async function createTicket(input: {
   const finalQueue = selectedQueue ?? (await db.select().from(queues).where(and(eq(queues.teamId, teamId), eq(queues.departmentId, departmentId), eq(queues.active, 1))).orderBy(asc(queues.id)).limit(1))[0];
   if (!finalQueue || finalQueue.teamId !== teamId || finalQueue.departmentId !== departmentId || !finalQueue.active) throw new Error("A equipe precisa ter uma fila ativa responsável");
   const queueId = finalQueue.id;
-  const publicNumber = `TF-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`;
+  // The destination department determines the approver. The requester never selects a person.
+  // Fail closed before creating a ticket if no active approver is configured for that department.
+  const departmentApprover = (await db.select({ id: users.id }).from(users).where(and(
+    eq(users.active, 1), eq(users.role, "user"), eq(users.profile, "approver"), eq(users.departmentId, departmentId),
+  )).orderBy(asc(users.id))).find(item => item.id !== input.user.id);
+  if (!departmentApprover) throw new Error("O setor de destino não possui um aprovador ativo configurado. Solicite ao administrador que configure o aprovador do setor.");
 
+  const publicNumber = `TF-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`;
   const [createdTicket] = await db.insert(tickets).values({
-    publicNumber,
-    title: input.title.trim(),
-    description: input.description.trim(),
-    requesterId: input.user.id,
-    departmentId,
-    teamId,
-    queueId,
-    ticketTypeId,
+    publicNumber, title: input.title.trim(), description: input.description.trim(), requesterId: input.user.id,
+    departmentId, teamId, queueId, ticketTypeId,
     categoryId: selectedCategory?.id ?? selectedService?.categoryId ?? null,
-    serviceId: selectedService?.id ?? null,
-    priority: input.priority,
-    status: "open",
-    approvalStatus: "pending",
+    serviceId: selectedService?.id ?? null, priority: input.priority, status: "open", approvalStatus: "pending",
   }).returning({ id: tickets.id });
   const ticketId = createdTicket.id;
-  await addEvent(ticketId, input.user.id, "ticket.created", { publicNumber, status: "open" });
-  await createNotification({ userId: input.user.id, ticketId, type: "ticket_created", title: "Chamado aberto", body: `${publicNumber} foi criado e está aguardando atendimento.` });
-  const firstApprover = (await db.select({ id: users.id }).from(users).where(and(
-    eq(users.active, 1),
-    or(eq(users.role, "admin"), and(eq(users.profile, "approver"), userAreaPredicate(users, departmentId, teamId))),
-  )).orderBy(asc(users.id)).limit(5)).find(item => item.id !== input.user.id);
-  if (firstApprover) {
-    const [createdApproval] = await db.insert(ticketApprovals).values({ ticketId, approverId: firstApprover.id, requestedById: input.user.id, requestNote: "Aprovação inicial do chamado", status: "pending" }).returning({ id: ticketApprovals.id });
-    const approvalId = createdApproval.id;
-    await createNotification({ userId: firstApprover.id, ticketId, approvalId, type: "approval_requested", title: "Aprovação pendente", body: `${publicNumber} aguarda sua aprovação inicial.` });
-  }
+  await addEvent(ticketId, input.user.id, "ticket.created", { publicNumber, status: "open", approvalStatus: "pending", destinationDepartmentId: departmentId });
+  const [createdApproval] = await db.insert(ticketApprovals).values({
+    ticketId, approverId: departmentApprover.id, requestedById: input.user.id,
+    requestNote: "Aprovação automática do setor de destino", status: "pending",
+  }).returning({ id: ticketApprovals.id });
+  await createNotification({ userId: input.user.id, ticketId, type: "ticket_created", title: "Chamado aberto", body: `${publicNumber} foi criado e enviado para aprovação do setor responsável.` });
+  await createNotification({ userId: departmentApprover.id, ticketId, approvalId: createdApproval.id, type: "approval_requested", title: "Aprovação pendente", body: `${publicNumber} aguarda sua validação como aprovador do setor.` });
   if (input.attachments?.length) await saveAttachments({ user: input.user, ticketId, attachments: input.attachments });
   return getTicketForUser(input.user, ticketId);
 }
@@ -796,7 +795,7 @@ export async function assignTicket(input: { user: User; ticketId: number; assign
   if (input.assigneeId) {
     const assignee = (await db.select().from(users).where(and(eq(users.id, input.assigneeId), eq(users.active, 1))).limit(1))[0];
     if (!assignee) throw new Error("Responsável não encontrado ou inativo");
-    if (assignee.role !== "admin" && !["agent", "approver", "manager"].includes(assignee.profile)) throw new Error("O responsável precisa ter perfil operacional");
+    if (assignee.role !== "admin" && !["agent", "manager"].includes(assignee.profile)) throw new Error("O responsável precisa ter perfil de atendente ou gestor");
     if (assignee.role !== "admin" && !(assignee.teamId ? assignee.teamId === ticket.teamId : assignee.departmentId === ticket.departmentId)) throw new Error("O responsável não pertence à área do chamado");
   }
   await db.update(tickets).set({ assigneeId: input.assigneeId, updatedAt: new Date() }).where(eq(tickets.id, input.ticketId));
@@ -808,7 +807,7 @@ export async function assignTicket(input: { user: User; ticketId: number; assign
 export async function claimTicket(input: { user: User; ticketId: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  if (input.user.role !== "admin" && !["agent", "approver", "manager"].includes(input.user.profile)) throw new Error("Somente usuários operacionais podem assumir chamados");
+  if (!canUserClaimTickets(input.user)) throw new Error("Somente atendentes, gestores ou administradores podem assumir chamados");
   const ticket = await getTicketForUser(input.user, input.ticketId);
   if (!ticket) throw new Error("Ticket not found or not accessible");
   if (ticket.approvalStatus !== "approved") throw new Error("O chamado ainda aguarda validação do aprovador");

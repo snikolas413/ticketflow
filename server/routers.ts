@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { authenticateLocalUser, clearCatalogAndTickets, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listUsersForAdmin, listSlaPolicies, updateSlaPolicy, localSetupStatus, markNotificationRead, replaceManagerScopes, requestApproval, setUserActive, setUserProfile, transitionTicket, updateServiceRouting } from "./db";
+import { authenticateLocalUser, clearCatalogAndTickets, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listUsersForAdmin, listSlaPolicies, updateSlaPolicy, localSetupStatus, markNotificationRead, replaceManagerScopes, setUserActive, setUserProfile, transitionTicket, updateServiceRouting } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { COOKIE_NAME } from "@shared/const";
@@ -88,7 +88,7 @@ export const appRouter = router({
     slaPolicies: protectedProcedure.query(({ ctx }) => { adminOnly(ctx.user.role); return listSlaPolicies(); }),
     updateSlaPolicy: protectedProcedure.input(z.object({ priority: z.enum(PRIORITIES), firstResponseHours: z.number().positive().max(8760), resolutionHours: z.number().positive().max(8760) })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return updateSlaPolicy({ actorId: ctx.user.id, ...input }); }),
     users: protectedProcedure.query(({ ctx }) => { adminOnly(ctx.user.role); return listUsersForAdmin(ctx.user); }),
-    createUser: protectedProcedure.input(z.object({ email: z.string().email().max(320), password: z.string().min(8).max(200), profile: profileInput, departmentId: z.number().int().positive().optional(), teamId: z.number().int().positive().optional() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return createUserInvitation({ admin: ctx.user, ...input }); }),
+    createUser: protectedProcedure.input(z.object({ name: z.string().trim().min(1).max(160), email: z.string().email().max(320), password: z.string().min(8).max(200), profile: profileInput, departmentId: z.number().int().positive().optional(), teamId: z.number().int().positive().optional() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return createUserInvitation({ admin: ctx.user, ...input }); }),
     setProfile: protectedProcedure.input(z.object({ userId: z.number().int().positive(), profile: profileInput })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return setUserProfile(ctx.user, input.userId, input.profile); }),
     setActive: protectedProcedure.input(z.object({ userId: z.number().int().positive(), active: z.boolean() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return setUserActive(ctx.user, input.userId, input.active); }),
     managerScopes: protectedProcedure.input(z.object({ userId: z.number().int().positive() })).query(({ ctx, input }) => { adminOnly(ctx.user.role); return listManagerScopes(ctx.user, input.userId); }),
@@ -109,7 +109,6 @@ export const appRouter = router({
   }),
   approvals: router({
     list: protectedProcedure.query(({ ctx }) => listApprovals(ctx.user)),
-    request: protectedProcedure.input(z.object({ ticketId: z.number().int().positive(), approverId: z.number().int().positive(), note: z.string().trim().max(2000).optional() })).mutation(({ ctx, input }) => requestApproval({ user: ctx.user, ...input })),
     decide: protectedProcedure.input(z.object({ approvalId: z.number().int().positive(), status: z.enum(["approved", "rejected"]), note: z.string().trim().max(2000).optional() })).mutation(({ ctx, input }) => decideApproval({ user: ctx.user, ...input })),
   }),
   tickets: router({
