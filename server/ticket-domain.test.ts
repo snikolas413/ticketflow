@@ -45,13 +45,13 @@ describe("ticket area access", () => {
 
 
 describe("ticket assignment permissions", () => {
-  it("allows attendants, managers, and administrators to claim tickets", () => {
+  it("allows attendants, approvers, managers, and administrators to claim tickets", () => {
     expect(canUserClaimTickets({ role: "user", profile: "agent" })).toBe(true);
+    expect(canUserClaimTickets({ role: "user", profile: "approver" })).toBe(true);
     expect(canUserClaimTickets({ role: "user", profile: "manager" })).toBe(true);
     expect(canUserClaimTickets({ role: "admin", profile: "requester" })).toBe(true);
   });
-  it("does not allow approvers or requesters to claim tickets", () => {
-    expect(canUserClaimTickets({ role: "user", profile: "approver" })).toBe(false);
+  it("does not allow requesters to claim tickets", () => {
     expect(canUserClaimTickets({ role: "user", profile: "requester" })).toBe(false);
   });
 });
