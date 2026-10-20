@@ -47,6 +47,7 @@ export default function Admin() {
   const [serviceDefaultTicketTypeId, setServiceDefaultTicketTypeId] = useState<number>();
   const [serviceDefaultQueueId, setServiceDefaultQueueId] = useState<number>();
   const [serviceRuleDrafts, setServiceRuleDrafts] = useState<Record<number, { defaultTicketTypeId: number | null; defaultQueueId: number | null }>>({});
+  const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [userPassword, setUserPassword] = useState("");
   const [userProfile, setUserProfile] = useState<Profile>("requester");
@@ -78,7 +79,7 @@ export default function Admin() {
   const createCategory = trpc.catalog.createCategory.useMutation({ onSuccess: () => { toast.success("Categoria criada"); setCategoryName(""); setCategoryCode(""); setCategoryParentId(undefined); void categories.refetch(); }, onError: error => toast.error(error.message) });
   const createService = trpc.catalog.createService.useMutation({ onSuccess: () => { toast.success("Serviço criado com regras de roteamento"); setServiceName(""); setServiceCode(""); setServiceCategoryId(undefined); setServiceDefaultTicketTypeId(undefined); setServiceDefaultQueueId(undefined); void services.refetch(); }, onError: error => toast.error(error.message) });
   const updateServiceRouting = trpc.catalog.updateServiceRouting.useMutation({ onSuccess: () => { toast.success("Regras de roteamento salvas"); setServiceRuleDrafts({}); void services.refetch(); void audit.refetch(); }, onError: error => toast.error(error.message) });
-  const createUser = trpc.admin.createUser.useMutation({ onSuccess: () => { toast.success("Usuário criado e pronto para login"); setUserEmail(""); setUserPassword(""); setUserDepartmentId(undefined); setUserTeamId(undefined); void users.refetch(); }, onError: error => toast.error(error.message) });
+  const createUser = trpc.admin.createUser.useMutation({ onSuccess: () => { toast.success("Usuário criado e pronto para login"); setUserName(""); setUserEmail(""); setUserPassword(""); setUserDepartmentId(undefined); setUserTeamId(undefined); void users.refetch(); }, onError: error => toast.error(error.message) });
   const setProfile = trpc.admin.setProfile.useMutation({ onSuccess: () => { toast.success("Perfil atualizado"); void users.refetch(); }, onError: error => toast.error(error.message) });
   const setUserActive = trpc.admin.setActive.useMutation({ onSuccess: () => { toast.success("Acesso atualizado"); void users.refetch(); }, onError: error => toast.error(error.message) });
   const setManagerScopes = trpc.admin.setManagerScopes.useMutation({ onSuccess: () => { toast.success("Escopo do gestor atualizado"); void managerScopes.refetch(); }, onError: error => toast.error(error.message) });
@@ -180,6 +181,9 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-secondary)] p-4 md:grid-cols-2">
+                <label className="space-y-1.5 text-xs font-medium text-[var(--app-muted-foreground)]">Nome completo
+                  <Input autoComplete="name" value={userName} onChange={event => setUserName(event.target.value)} placeholder="Nome e sobrenome" />
+                </label>
                 <label className="space-y-1.5 text-xs font-medium text-[var(--app-muted-foreground)]">E-mail corporativo
                   <Input type="email" autoComplete="email" value={userEmail} onChange={event => setUserEmail(event.target.value)} placeholder="nome@empresa.com.br" />
                 </label>
@@ -207,7 +211,7 @@ export default function Admin() {
                 </>}
                 {userProfile !== "requester" && <p className="text-xs leading-5 text-[var(--app-muted-foreground)] md:col-span-2">Atendentes, aprovadores e gestores precisam estar vinculados a um setor.</p>}
                 <div className="md:col-span-2">
-                  <Button className="w-full sm:w-auto" disabled={createUser.isPending || !userEmail.includes("@") || userPassword.length < 8 || (userProfile !== "requester" && !userDepartmentId)} onClick={() => createUser.mutate({ email: userEmail, password: userPassword, profile: userProfile, departmentId: userDepartmentId, teamId: userTeamId })}>
+                  <Button className="w-full sm:w-auto" disabled={createUser.isPending || !userName.trim() || !userEmail.includes("@") || userPassword.length < 8 || (userProfile !== "requester" && !userDepartmentId)} onClick={() => createUser.mutate({ name: userName.trim(), email: userEmail, password: userPassword, profile: userProfile, departmentId: userDepartmentId, teamId: userTeamId })}>
                     {createUser.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <UserPlus className="mr-2 size-4" />}
                     Criar usuário
                   </Button>
