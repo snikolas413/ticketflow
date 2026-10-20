@@ -367,7 +367,7 @@ export default function Home() {
               <span>Meus chamados</span>
               <span
                 className={`ml-1 rounded-full px-2 py-0.5 text-xs font-bold ${
-                  currentTab === "my_tickets" ? "bg-[#ed1b36] text-white" : "bg-[#e5e8f0] text-[var(--app-muted-foreground)]"
+                  currentTab === "my_tickets" ? "bg-[#ed1b36] text-white" : "bg-[var(--app-secondary)] text-[var(--app-muted-foreground)]"
                 }`}
               >
                 {metrics.myAssignedCount}
@@ -384,7 +384,7 @@ export default function Home() {
             >
               <Inbox className="size-4" />
               <span>Fila geral</span>
-              <span className="ml-1 rounded-full bg-[#e5e8f0] px-2 py-0.5 text-xs font-bold text-[var(--app-muted-foreground)]">
+              <span className="ml-1 rounded-full bg-[var(--app-secondary)] px-2 py-0.5 text-xs font-bold text-[var(--app-muted-foreground)]">
                 {metrics.total}
               </span>
             </button>
@@ -453,7 +453,7 @@ export default function Home() {
 
             {/* SLA health summary */}
             <Card className="border-[var(--app-border)] shadow-sm">
-              <CardHeader className="border-b border-[#edf0f5] pb-4">
+              <CardHeader className="border-b border-[var(--app-border)] pb-4">
                 <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                   <div>
                     <CardTitle className="text-base text-[var(--app-foreground)]">Saúde dos SLAs</CardTitle>
@@ -488,7 +488,7 @@ export default function Home() {
 
             {/* Resolution performance KPI */}
             <Card className="border-[var(--app-border)] shadow-sm">
-              <CardHeader className="border-b border-[#edf0f5] pb-3">
+              <CardHeader className="border-b border-[var(--app-border)] pb-3">
                 <CardTitle className="text-base text-[var(--app-foreground)]">Tempo médio de resolução</CardTitle>
                 <p className="text-xs text-[var(--app-muted-foreground)]">Tempo entre a abertura e a resolução registrada</p>
               </CardHeader>
@@ -513,7 +513,7 @@ export default function Home() {
 
             {effectiveUser?.role === "admin" && (
               <Card className="border-[var(--app-border)] shadow-sm">
-                <CardHeader className="border-b border-[#edf0f5] pb-4">
+                <CardHeader className="border-b border-[var(--app-border)] pb-4">
                   <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                     <div>
                       <CardTitle className="text-base text-[var(--app-foreground)]">Carga por responsável</CardTitle>
@@ -531,7 +531,7 @@ export default function Home() {
                       <p className="mt-1 text-2xl font-bold text-amber-800">{assigneeWorkload.unassigned}</p>
                       <p className="mt-1 text-[11px] text-amber-700">Chamados ativos que precisam de triagem</p>
                     </div>
-                    <div className="rounded-xl border border-[var(--app-border)] bg-[#f8f9fc] p-3">
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-secondary)] p-3">
                       <p className="text-xs font-medium text-[var(--app-muted-foreground)]">Ativos atribuídos</p>
                       <p className="mt-1 text-2xl font-bold text-[var(--app-foreground)]">
                         {assigneeWorkload.workload.reduce((sum, person) => sum + person.active, 0)}
@@ -544,7 +544,7 @@ export default function Home() {
                   ) : assigneeWorkload.workload.length === 0 ? (
                     <p className="p-5 text-sm text-[var(--app-muted-foreground)]">Ainda não há chamados atribuídos a responsáveis.</p>
                   ) : (
-                    <div className="divide-y divide-[#edf0f5]">
+                    <div className="divide-y divide-[var(--app-border)]">
                       {assigneeWorkload.workload.slice(0, 8).map((person) => {
                         const maxActive = Math.max(1, ...assigneeWorkload.workload.map((item) => item.active));
                         const workloadPercent = Math.round((person.active / maxActive) * 100);
@@ -579,7 +579,7 @@ export default function Home() {
             <div className="grid gap-6 lg:grid-cols-3">
               {/* Distribution by Priority Card */}
               <Card className="border-[var(--app-border)] shadow-sm">
-                <CardHeader className="border-b border-[#edf0f5] pb-4">
+                <CardHeader className="border-b border-[var(--app-border)] pb-4">
                   <CardTitle className="text-base text-[var(--app-foreground)]">Distribuição por Prioridade</CardTitle>
                   <p className="text-xs text-[var(--app-muted-foreground)]">Impacto e urgência das demandas ativas</p>
                 </CardHeader>
@@ -648,12 +648,12 @@ export default function Home() {
 
               {/* Operational Status Card */}
               <Card className="border-[var(--app-border)] shadow-sm">
-                <CardHeader className="border-b border-[#edf0f5] pb-4">
+                <CardHeader className="border-b border-[var(--app-border)] pb-4">
                   <CardTitle className="text-base text-[var(--app-foreground)]">Status Operacional</CardTitle>
                   <p className="text-xs text-[var(--app-muted-foreground)]">Fluxo de trabalho e saúde do atendimento</p>
                 </CardHeader>
                 <CardContent className="space-y-3 p-5 text-sm">
-                  <div className="flex items-center justify-between rounded-lg bg-[#f8f9fc] p-3">
+                  <div className="flex items-center justify-between rounded-lg bg-[var(--app-secondary)] p-3">
                     <div className="flex items-center gap-2.5">
                       <UserCheck className="size-4 text-[#ed1b36]" />
                       <span className="text-xs font-medium text-[var(--app-foreground)]">Designados a Você</span>
@@ -663,7 +663,7 @@ export default function Home() {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between rounded-lg bg-[#f8f9fc] p-3">
+                  <div className="flex items-center justify-between rounded-lg bg-[var(--app-secondary)] p-3">
                     <div className="flex items-center gap-2.5">
                       <UserRound className="size-4 text-[#d97706]" />
                       <span className="text-xs font-medium text-[var(--app-foreground)]">Sem Atribuição (Fila Livre)</span>
@@ -673,7 +673,7 @@ export default function Home() {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between rounded-lg bg-[#f8f9fc] p-3">
+                  <div className="flex items-center justify-between rounded-lg bg-[var(--app-secondary)] p-3">
                     <div className="flex items-center gap-2.5">
                       <AlertTriangle className="size-4 text-[#a855f7]" />
                       <span className="text-xs font-medium text-[var(--app-foreground)]">Aguardando Validação/Aprovação</span>
@@ -686,7 +686,7 @@ export default function Home() {
                   <div className="pt-2">
                     <Button
                       variant="outline"
-                      className="w-full text-xs font-semibold text-[#ed1b36] hover:bg-[#eef2ff]"
+                      className="w-full text-xs font-semibold text-[#ed1b36] hover:bg-[var(--app-accent)]"
                       onClick={() => setLocation("/my-tickets")}
                     >
                       Ver Meus Chamados Atribuídos <ArrowRight className="ml-1 size-3.5" />
@@ -697,7 +697,7 @@ export default function Home() {
 
               {/* Workspace / Context Info Card */}
               <Card className="border-[var(--app-border)] shadow-sm">
-                <CardHeader className="border-b border-[#edf0f5] pb-4">
+                <CardHeader className="border-b border-[var(--app-border)] pb-4">
                   <CardTitle className="text-base text-[var(--app-foreground)]">Seu Espaço de Trabalho</CardTitle>
                   <p className="text-xs text-[var(--app-muted-foreground)]">Parâmetros do seu perfil e setor</p>
                 </CardHeader>
@@ -716,7 +716,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[var(--app-muted-foreground)]">Perfil Operacional</span>
-                    <Badge variant="outline" className="border-[#3157d5]/30 bg-[#eef2ff] text-[11px] text-[#ed1b36]">
+                    <Badge variant="outline" className="border-[#3157d5]/30 bg-[var(--app-accent)] text-[11px] text-[#ed1b36]">
                       {effectiveUser?.role === "admin" ? "Administrador Geral" : "Operador"}
                     </Badge>
                   </div>
@@ -741,7 +741,7 @@ export default function Home() {
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Critical Attention Card */}
               <Card className="border-[var(--app-border)] shadow-sm">
-                <CardHeader className="border-b border-[#edf0f5] pb-4">
+                <CardHeader className="border-b border-[var(--app-border)] pb-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="flex items-center gap-2 text-base text-[var(--app-foreground)]">
@@ -764,12 +764,12 @@ export default function Home() {
                       </p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-[#edf0f5]">
+                    <div className="divide-y divide-[var(--app-border)]">
                       {metrics.criticalTickets.slice(0, 5).map((t) => (
                         <button
                           key={t.id}
                           onClick={() => setLocation(`/tickets/${t.id}`)}
-                          className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-[#f8f9fc]"
+                          className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-[var(--app-secondary)]"
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
@@ -797,7 +797,7 @@ export default function Home() {
 
               {/* Recent Activity Card */}
               <Card className="border-[var(--app-border)] shadow-sm">
-                <CardHeader className="border-b border-[#edf0f5] pb-4">
+                <CardHeader className="border-b border-[var(--app-border)] pb-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-base text-[var(--app-foreground)]">Últimos Chamados Movimentados</CardTitle>
@@ -806,7 +806,7 @@ export default function Home() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-xs text-[#ed1b36] hover:bg-[#eef2ff]"
+                      className="text-xs text-[#ed1b36] hover:bg-[var(--app-accent)]"
                       onClick={() => setLocation("/tickets")}
                     >
                       Ver fila completa →
@@ -817,12 +817,12 @@ export default function Home() {
                   {allRows.length === 0 ? (
                     <div className="p-8 text-center text-xs text-[var(--app-muted-foreground)]">Nenhum chamado registrado ainda.</div>
                   ) : (
-                    <div className="divide-y divide-[#edf0f5]">
+                    <div className="divide-y divide-[var(--app-border)]">
                       {allRows.slice(0, 5).map((t) => (
                         <button
                           key={t.id}
                           onClick={() => setLocation(`/tickets/${t.id}`)}
-                          className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-[#f8f9fc]"
+                          className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-[var(--app-secondary)]"
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
@@ -853,7 +853,7 @@ export default function Home() {
         {currentTab === "my_tickets" && (
           <div className="mt-8 space-y-6">
             {/* Banner explaining strict assignment scope */}
-            <div className="flex flex-col justify-between gap-4 rounded-2xl border border-[var(--app-border)] bg-[#f8faff] p-5 md:flex-row md:items-center">
+            <div className="flex flex-col justify-between gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-secondary)] p-5 md:flex-row md:items-center">
               <div className="flex items-center gap-3">
                 <div className="rounded-xl bg-[#ed1b36] p-2.5 text-white">
                   <UserCheck className="size-5" />
@@ -929,7 +929,7 @@ export default function Home() {
                   </div>
                 ) : myRows.length === 0 ? (
                   <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                    <div className="mb-4 rounded-2xl bg-[#eef2ff] p-4 text-[#ed1b36]">
+                    <div className="mb-4 rounded-2xl bg-[var(--app-accent)] p-4 text-[#ed1b36]">
                       <ClipboardList className="size-8" />
                     </div>
                     <p className="text-base font-bold text-[var(--app-foreground)]">Nenhum chamado designado a você</p>
@@ -956,12 +956,12 @@ export default function Home() {
                     </div>
                   </div>
                 ) : (
-                  <div className="divide-y divide-[#edf0f5]">
+                  <div className="divide-y divide-[var(--app-border)]">
                     {myRows.map((ticket) => (
                       <button
                         key={ticket.id}
                         onClick={() => setLocation(`/tickets/${ticket.id}`)}
-                        className="ticket-row group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-[#f8f9fc]"
+                        className="ticket-row group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--app-secondary)]"
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -1123,7 +1123,7 @@ export default function Home() {
                   </div>
                 ) : allRows.length === 0 ? (
                   <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                    <div className="mb-4 rounded-2xl bg-[#eef2ff] p-4 text-[#ed1b36]">
+                    <div className="mb-4 rounded-2xl bg-[var(--app-accent)] p-4 text-[#ed1b36]">
                       <Ticket className="size-8" />
                     </div>
                     <p className="text-base font-bold text-[var(--app-foreground)]">Nenhum chamado encontrado</p>
@@ -1138,12 +1138,12 @@ export default function Home() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="divide-y divide-[#edf0f5]">
+                  <div className="divide-y divide-[var(--app-border)]">
                     {allRows.map((ticket) => (
                       <button
                         key={ticket.id}
                         onClick={() => setLocation(`/tickets/${ticket.id}`)}
-                        className="ticket-row group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-[#f8f9fc]"
+                        className="ticket-row group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--app-secondary)]"
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -1232,7 +1232,7 @@ export default function Home() {
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#0d1730]/40 p-0 backdrop-blur-sm sm:items-center sm:p-6">
           <Card className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-b-none border-0 shadow-2xl sm:rounded-2xl">
-            <CardHeader className="border-b border-[#edf0f5] pb-4">
+            <CardHeader className="border-b border-[var(--app-border)] pb-4">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="eyebrow text-[#ed1b36]">Novo registro</p>
@@ -1247,7 +1247,7 @@ export default function Home() {
               {!departments.isLoading &&
                 !ticketTypes.isLoading &&
                 (!departments.data?.length || !ticketTypes.data?.length) && (
-                  <div className="rounded-xl border border-[#f1d9a8] bg-[#fff8e9] p-3 text-xs leading-5 text-[#8a5a12]">
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-[#8a5a12]">
                     Configure setor, equipe, fila e tipo de chamado no menu administrativo antes de abrir o primeiro
                     chamado.
                   </div>
@@ -1371,7 +1371,7 @@ export default function Home() {
                 <input
                   type="file"
                   multiple
-                  className="mt-2 block w-full text-xs text-[var(--app-muted-foreground)] file:mr-3 file:rounded-lg file:border-0 file:bg-[#eef2ff] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#ed1b36]"
+                  className="mt-2 block w-full text-xs text-[var(--app-muted-foreground)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--app-accent)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#ed1b36]"
                   onChange={async (event) => {
                     try {
                       const selected = Array.from(event.target.files ?? []);
@@ -1397,7 +1397,7 @@ export default function Home() {
                 )}
               </div>
 
-              <div className="flex justify-end gap-3 border-t border-[#edf0f5] pt-5">
+              <div className="flex justify-end gap-3 border-t border-[var(--app-border)] pt-5">
                 <Button variant="outline" onClick={() => setShowCreate(false)}>
                   Cancelar
                 </Button>
