@@ -1,20 +1,40 @@
 import { connect as connectTls, type TLSSocket } from "node:tls";
 import { ENV } from "./env";
 
-function readReply(socket: TLSSocket): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let buffer = "";
-    const cleanup = () => { socket.off("data", onData); socket.off("error", onError); };
-    const onError = (error: Error) => { cleanup(); reject(error); };
-    const onData = (chunk: Buffer) => {
-      buffer += chunk.toString("utf8");
+const buffers = new WeakMap<TLSSocket, string>();
+const waiters = new WeakMap<TLSSocket, Array<{ resolve: (value: string) => void; reject: (error: Error) => void }>>();
+
+function attachReader(socket: TLSSocket) {
+  buffers.set(socket, "");
+  waiters.set(socket, []);
+  socket.on("data", (chunk: Buffer) => {
+    buffers.set(socket, (buffers.get(socket) ?? "") + chunk.toString("utf8"));
+    const pending = waiters.get(socket) ?? [];
+    while (pending.length) {
+      const buffer = buffers.get(socket) ?? "";
       const lines = buffer.split("\\r\\n");
-      const final = [...lines].reverse().find(line => /^\\d{3} /.test(line));
-      if (final) { cleanup(); resolve(buffer); }
-    };
-    socket.on("data", onData);
-    socket.once("error", onError);
+      const end = lines.findIndex(line => /^\\d{3} /.test(line));
+      if (end < 0) break;
+      const reply = lines.slice(0, end + 1).join("\\r\\n");
+      buffers.set(socket, lines.slice(end + 1).join("\\r\\n"));
+      pending.shift()!.resolve(reply);
+    }
   });
+  socket.on("error", error => {
+    const pending = waiters.get(socket) ?? [];
+    while (pending.length) pending.shift()!.reject(error);
+  });
+}
+
+function readReply(socket: TLSSocket): Promise<string> {
+  const buffer = buffers.get(socket) ?? "";
+  const lines = buffer.split("\\r\\n");
+  const end = lines.findIndex(line => /^\\d{3} /.test(line));
+  if (end >= 0) {
+    buffers.set(socket, lines.slice(end + 1).join("\\r\\n"));
+    return Promise.resolve(lines.slice(0, end + 1).join("\\r\\n"));
+  }
+  return new Promise((resolve, reject) => waiters.get(socket)!.push({ resolve, reject }));
 }
 
 async function command(socket: TLSSocket, value?: string, accepted: number[] = [250]) {
@@ -30,6 +50,7 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   if (!ENV.smtpUser || !ENV.smtpPass || !ENV.smtpFrom) throw new Error("SMTP Gmail não configurado no ambiente");
   if (ENV.smtpPort !== 465) throw new Error("A configuração Gmail exige SMTP_PORT=465 (TLS)");
   const socket = connectTls({ host: ENV.smtpHost, port: ENV.smtpPort, servername: ENV.smtpHost });
+  attachReader(socket);
   socket.setTimeout(15000, () => socket.destroy(new Error("Tempo limite SMTP excedido")));
   try {
     await new Promise<void>((resolve, reject) => {
