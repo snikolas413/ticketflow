@@ -95,6 +95,24 @@ export default function KPIs() {
         return { ...event, payload };
       });
     const reopenedCount = workflowEvents.filter(event => event.payload.from === "resolved" && event.payload.to === "in_progress").length;
+    const actionByActor = new Map<number, { id: number; name: string; transitions: number; resolved: number; closed: number; reopened: number }>();
+    for (const event of workflowEvents) {
+      if (event.actorId === null) continue;
+      const current = actionByActor.get(event.actorId) ?? {
+        id: event.actorId,
+        name: event.actorName?.trim() || "Usuário sem nome",
+        transitions: 0,
+        resolved: 0,
+        closed: 0,
+        reopened: 0,
+      };
+      current.transitions += 1;
+      if (event.payload.to === "resolved") current.resolved += 1;
+      if (event.payload.to === "closed") current.closed += 1;
+      if (event.payload.from === "resolved" && event.payload.to === "in_progress") current.reopened += 1;
+      actionByActor.set(event.actorId, current);
+    }
+    const actionBreakdown = Array.from(actionByActor.values()).sort((a, b) => b.transitions - a.transitions || a.name.localeCompare(b.name));
     const requesterValidationDurations: number[] = [];
     const eventsByTicket = new Map<number, typeof workflowEvents>();
     for (const event of workflowEvents) {
@@ -198,7 +216,7 @@ export default function KPIs() {
       responseRate: tickets.length ? Math.round(responded.length / tickets.length * 100) : 0,
       averageResolutionHours, averageRequesterValidationHours, reopenedCount, unassigned, urgentActive, pendingApproval, breached, monitored, atRisk,
       slaCompliance: monitored ? Math.round((monitored - breached) / monitored * 100) : null,
-      statusData, priorityData, trend, departmentBreakdown, teamBreakdown, assigneeBreakdown,
+      statusData, priorityData, trend, departmentBreakdown, teamBreakdown, assigneeBreakdown, actionBreakdown,
     };
   }, [rows, period, departmentFilter, teamFilter, departmentsQuery.data, teamsQuery.data, assigneeNamesQuery.data, policiesQuery.data, workflowEventsQuery.data]);
 
@@ -264,6 +282,14 @@ export default function KPIs() {
         <Card className="border-[var(--app-border)] bg-[var(--app-card)]">
           <CardHeader><CardTitle className="text-base">Desempenho por equipe</CardTitle><p className="text-xs text-[var(--app-muted-foreground)]">Comparativo das equipes visíveis para o usuário autenticado.</p></CardHeader>
           <CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-[var(--app-border)] text-left text-xs text-[var(--app-muted-foreground)]"><th className="py-2 pr-3">Equipe</th><th className="py-2 px-2 text-right">Recebidos</th><th className="py-2 px-2 text-right">Ativos</th><th className="py-2 px-2 text-right">Encerrados</th><th className="py-2 pl-2 text-right">Média resolução</th></tr></thead><tbody>{data.teamBreakdown.length ? data.teamBreakdown.map(item => <tr key={item.id} className="border-b border-[var(--app-border)] last:border-0"><td className="py-3 pr-3 font-medium">{item.name}</td><td className="px-2 text-right tabular-nums">{item.total}</td><td className="px-2 text-right tabular-nums">{item.active}</td><td className="px-2 text-right tabular-nums">{item.closed}</td><td className="pl-2 text-right tabular-nums">{item.avgHours === null ? "N/D" : item.avgHours.toFixed(1) + " h"}</td></tr>) : <tr><td colSpan={5} className="py-6 text-center text-xs text-[var(--app-muted-foreground)]">Sem dados para os filtros selecionados.</td></tr>}</tbody></table></div></CardContent>
+        </Card>
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-center gap-2"><Workflow className="size-4 text-[#ed1b36]" /><h2 className="text-sm font-semibold">Atividade registrada por usuário</h2></div>
+        <Card className="border-[var(--app-border)] bg-[var(--app-card)]">
+          <CardHeader><CardTitle className="text-base">Movimentações do fluxo por usuário</CardTitle><p className="text-xs text-[var(--app-muted-foreground)]">Conta alterações de status registradas no histórico, atribuídas a quem realizou a movimentação. Não equivale a volume de chamados atribuídos.</p></CardHeader>
+          <CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-[var(--app-border)] text-left text-xs text-[var(--app-muted-foreground)]"><th className="py-2 pr-3">Usuário</th><th className="py-2 px-2 text-right">Movimentações</th><th className="py-2 px-2 text-right">Resolvidos</th><th className="py-2 px-2 text-right">Encerrados</th><th className="py-2 pl-2 text-right">Reaberturas</th></tr></thead><tbody>{data.actionBreakdown.length ? data.actionBreakdown.map(item => <tr key={item.id} className="border-b border-[var(--app-border)] last:border-0"><td className="py-3 pr-3 font-medium">{item.name}</td><td className="px-2 text-right tabular-nums">{item.transitions}</td><td className="px-2 text-right tabular-nums">{item.resolved}</td><td className="px-2 text-right tabular-nums">{item.closed}</td><td className="pl-2 text-right tabular-nums">{item.reopened}</td></tr>) : <tr><td colSpan={5} className="py-6 text-center text-xs text-[var(--app-muted-foreground)]">Sem movimentações registradas para os filtros selecionados.</td></tr>}</tbody></table></div></CardContent>
         </Card>
       </section>
 
