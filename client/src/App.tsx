@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Admin from "./pages/Admin";
 import KPIs from "./pages/KPIs";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 
 function Router() {
   return <Switch>
