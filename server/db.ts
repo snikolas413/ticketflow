@@ -504,6 +504,15 @@ export async function listTickets(user: User, filters: TicketFilters = {}) {
     .orderBy(desc(tickets.updatedAt));
 }
 
+export async function listTicketAssigneeNames(user: User) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const visibleTickets = await listTickets(user);
+  const assigneeIds = Array.from(new Set(visibleTickets.map(ticket => ticket.assigneeId).filter((id): id is number => id !== null)));
+  if (!assigneeIds.length) return [];
+  return db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, assigneeIds));
+}
+
 export async function listTicketWorkflowEvents(user: User) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
