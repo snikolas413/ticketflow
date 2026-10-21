@@ -87,6 +87,7 @@ export default function Admin() {
   const updateServiceRouting = trpc.catalog.updateServiceRouting.useMutation({ onSuccess: () => { toast.success("Regras de roteamento salvas"); setServiceRuleDrafts({}); void services.refetch(); void audit.refetch(); }, onError: error => toast.error(error.message) });
   const createUser = trpc.admin.createUser.useMutation({ onSuccess: () => { toast.success("Usuário criado e pronto para login"); setUserName(""); setUserEmail(""); setUserPassword(""); setUserDepartmentId(undefined); setUserTeamId(undefined); void users.refetch(); }, onError: error => toast.error(error.message) });
   const updateUser = trpc.admin.updateUser.useMutation({ onSuccess: () => { toast.success("Dados do usuário atualizados"); setEditingUserId(undefined); void users.refetch(); void audit.refetch(); }, onError: error => toast.error(error.message) });
+  const sendPasswordReset = trpc.admin.sendPasswordReset.useMutation({ onSuccess: () => toast.success("Link de redefinição enviado por e-mail"), onError: error => toast.error(error.message) });
   const setProfile = trpc.admin.setProfile.useMutation({ onSuccess: () => { toast.success("Perfil atualizado"); void users.refetch(); }, onError: error => toast.error(error.message) });
   const setUserActive = trpc.admin.setActive.useMutation({ onSuccess: () => { toast.success("Acesso atualizado"); void users.refetch(); }, onError: error => toast.error(error.message) });
   const setManagerScopes = trpc.admin.setManagerScopes.useMutation({ onSuccess: () => { toast.success("Escopo do gestor atualizado"); void managerScopes.refetch(); }, onError: error => toast.error(error.message) });
@@ -240,6 +241,7 @@ export default function Admin() {
                     <p className="mt-1 text-[11px] text-[var(--app-muted-foreground)]">{departments.data?.find(department => department.id === account.departmentId)?.name ?? "Sem setor"}{account.teamId ? ` · ${teams.data?.find(team => team.id === account.teamId)?.name ?? "Equipe"}` : ""}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={sendPasswordReset.isPending || account.active !== 1 || !account.email} onClick={() => sendPasswordReset.mutate({ userId: account.id })}><Mail className="mr-1 size-3.5" />Redefinir senha</Button>
                     <Button variant="outline" size="sm" onClick={() => { setEditingUserId(account.id); setEditName(account.name ?? ""); setEditEmail(account.email ?? ""); setEditProfile(account.profile); setEditDepartmentId(account.departmentId ?? undefined); setEditTeamId(account.teamId ?? undefined); }}>Editar dados</Button>
                     {account.role === "admin" && <Badge variant="outline">Administrador</Badge>}
                     <select aria-label={`Perfil de ${account.email ?? account.id}`} className="h-9 rounded-md border border-input bg-background px-2 text-xs" value={account.profile} onChange={event => setProfile.mutate({ userId: account.id, profile: event.target.value as Profile })} disabled={setProfile.isPending}>
