@@ -9,7 +9,7 @@ import { calculateTicketSla } from "@shared/sla";
 import { PRIORITY_LABELS, STATUS_LABELS, type TicketPriority, type TicketStatus } from "@shared/ticket-types";
 import {
   AlertCircle, CheckCircle2, Clock3, Gauge, Inbox, RefreshCw, ShieldCheck, Ticket,
-  Timer, Users, UserX, Workflow,
+  Download, Timer, Users, UserX, Workflow,
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -202,6 +202,38 @@ export default function KPIs() {
     };
   }, [rows, period, departmentFilter, teamFilter, departmentsQuery.data, teamsQuery.data, assigneeNamesQuery.data, policiesQuery.data, workflowEventsQuery.data]);
 
+  const exportCsv = () => {
+    const rows: string[][] = [
+      ["Tipo", "Indicador", "Valor"],
+      ["Resumo", "Chamados recebidos", String(data.total)],
+      ["Resumo", "Backlog ativo", String(data.active)],
+      ["Resumo", "Resolvidos ou encerrados", String(data.completed)],
+      ["Resumo", "Taxa de resolução (%)", String(data.resolutionRate)],
+      ["Resumo", "Tempo médio até resolução (h)", data.averageResolutionHours === null ? "N/D" : data.averageResolutionHours.toFixed(1)],
+      ["Resumo", "Chamados reabertos", String(data.reopenedCount)],
+      ["Resumo", "Tempo médio de validação (h)", data.averageRequesterValidationHours === null ? "N/D" : data.averageRequesterValidationHours.toFixed(1)],
+      ["Resumo", "Conformidade SLA ativo (%)", data.slaCompliance === null ? "N/D" : String(data.slaCompliance)],
+      ["Resumo", "Prazos vencidos", String(data.breached)],
+      ["Resumo", "Prazos em risco", String(data.atRisk)],
+      ["Atendente", "Nome", "Vinculados", "Ativos", "Resolvidos", "Encerrados", "Média resolução (h)"],
+      ...data.assigneeBreakdown.map(item => ["Atendente", item.name, String(item.linked), String(item.active), String(item.resolved), String(item.closed), item.avgHours === null ? "N/D" : item.avgHours.toFixed(1)]),
+      ["Setor", "Nome", "Recebidos", "Ativos", "Encerrados", "Média resolução (h)"],
+      ...data.departmentBreakdown.map(item => ["Setor", item.name, String(item.total), String(item.active), String(item.closed), item.avgHours === null ? "N/D" : item.avgHours.toFixed(1)]),
+      ["Equipe", "Nome", "Recebidos", "Ativos", "Encerrados", "Média resolução (h)"],
+      ...data.teamBreakdown.map(item => ["Equipe", item.name, String(item.total), String(item.active), String(item.closed), item.avgHours === null ? "N/D" : item.avgHours.toFixed(1)]),
+    ];
+    const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ticketflow-kpis-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) return <div className="p-10 text-sm text-[var(--app-muted-foreground)]">Carregando indicadores…</div>;
   if (!user) return <div className="p-10 text-sm">Entre no TicketFlow para acessar os KPIs.</div>;
 
@@ -214,6 +246,7 @@ export default function KPIs() {
           <p className="mt-2 max-w-2xl text-sm text-[var(--app-muted-foreground)]">Visão ponta a ponta: entrada, atendimento, aprovação, resolução, validação do solicitante e cumprimento de SLA.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={exportCsv} className="inline-flex h-10 items-center gap-2 rounded-md border border-[var(--app-border)] px-3 text-sm font-medium transition-colors hover:bg-[var(--app-muted)]"><Download className="size-4" />Exportar CSV</button>
           <div className="flex items-center gap-2"><span className="text-xs text-[var(--app-muted-foreground)]">Setor</span>
             <Select value={departmentFilter} onValueChange={value => { setDepartmentFilter(value); setTeamFilter("all"); }}>
               <SelectTrigger className="w-44"><SelectValue placeholder="Todos os setores" /></SelectTrigger>
