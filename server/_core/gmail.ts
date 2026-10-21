@@ -79,9 +79,8 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
       "",
       "Se você não solicitou esta alteração, ignore este e-mail.",
       "",
-      ".",
     ].join("\r\n").replace(/\r\n\./g, "\r\n..");
-    await command(socket, body, [250]);
+    await command(socket, body + "\r\n.", [250]);
     await command(socket, "QUIT", [221]);
   } finally {
     socket.end();
