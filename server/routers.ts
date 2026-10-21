@@ -108,6 +108,17 @@ export const appRouter = router({
     users: protectedProcedure.query(({ ctx }) => { adminOnly(ctx.user.role); return listUsersForAdmin(ctx.user); }),
     createUser: protectedProcedure.input(z.object({ name: z.string().trim().min(1).max(160), email: z.string().email().max(320), password: z.string().min(8).max(200), profile: profileInput, departmentId: z.number().int().positive().optional(), teamId: z.number().int().positive().optional() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return createUserInvitation({ admin: ctx.user, ...input }); }),
     updateUser: protectedProcedure.input(z.object({ userId: z.number().int().positive(), name: z.string().trim().min(1).max(160), email: z.string().email().max(320), profile: profileInput, departmentId: z.number().int().positive().nullable().optional(), teamId: z.number().int().positive().nullable().optional() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return updateUserAccount(ctx.user, input); }),
+    sendPasswordReset: protectedProcedure.input(z.object({ userId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      adminOnly(ctx.user.role);
+      const target = (await listUsersForAdmin(ctx.user)).find(user => user.id === input.userId);
+      if (!target?.email || target.active !== 1) throw new TRPCError({ code: "BAD_REQUEST", message: "Usuário sem e-mail cadastrado ou inativo." });
+      const request = await createPasswordResetToken(target.email);
+      if (!request) throw new TRPCError({ code: "BAD_REQUEST", message: "Não foi possível criar o link de recuperação." });
+      const baseUrl = (process.env.APP_BASE_URL ?? "https://ticketflow-j2e5.onrender.com").replace(/\\/$/, "");
+      await sendPasswordResetEmail(request.email, `${baseUrl}/reset-password?token=${encodeURIComponent(request.token)}`);
+      return { success: true };
+    }),
+
     setProfile: protectedProcedure.input(z.object({ userId: z.number().int().positive(), profile: profileInput })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return setUserProfile(ctx.user, input.userId, input.profile); }),
     setActive: protectedProcedure.input(z.object({ userId: z.number().int().positive(), active: z.boolean() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return setUserActive(ctx.user, input.userId, input.active); }),
     managerScopes: protectedProcedure.input(z.object({ userId: z.number().int().positive() })).query(({ ctx, input }) => { adminOnly(ctx.user.role); return listManagerScopes(ctx.user, input.userId); }),
