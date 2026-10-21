@@ -202,6 +202,53 @@ export default function KPIs() {
     };
   }, [rows, period, departmentFilter, teamFilter, departmentsQuery.data, teamsQuery.data, assigneeNamesQuery.data, policiesQuery.data, workflowEventsQuery.data]);
 
+
+  const exportManagementReport = () => {
+    const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]!));
+    const number = (value: number | null, suffix = "") => value === null ? "N/D" : `${value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}${suffix}`;
+    const periodLabel = period === "30" ? "Últimos 30 dias" : period === "90" ? "Últimos 90 dias" : "Todo o período";
+    const departmentLabel = departmentFilter === "all" ? "Todos os setores" : (departmentsQuery.data ?? []).find(item => String(item.id) === departmentFilter)?.name ?? "Setor selecionado";
+    const teamLabel = teamFilter === "all" ? "Todas as equipes" : (teamsQuery.data ?? []).find(item => String(item.id) === teamFilter)?.name ?? "Equipe selecionada";
+    const barRows = (items: { name: string; value: number; color?: string }[]) => items.map(item => {
+      const width = Math.max(0, Math.min(100, data.total ? item.value / Math.max(...items.map(entry => entry.value), 1) * 100 : 0));
+      return `<div class="bar-row"><div class="bar-label">${escapeHtml(item.name)}</div><div class="bar-track"><div class="bar-fill" style="width:${width}%;background:${item.color ?? "#ed1b36"}"></div></div><strong>${item.value}</strong></div>`;
+    }).join("");
+    const table = (headers: string[], rows: (string | number)[][]) => `<table><thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.length ? rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${headers.length}" class="empty">Sem dados para os filtros selecionados</td></tr>`}</tbody></table>`;
+    const summary = [
+      ["Chamados recebidos", data.total, "blue"], ["Backlog ativo", data.active, data.active ? "amber" : "green"],
+      ["Resolvidos ou encerrados", data.completed, "green"], ["Taxa de resolução", number(data.resolutionRate, "%"), "purple"],
+      ["Tempo médio até resolução", data.averageResolutionHours === null ? "N/D" : number(data.averageResolutionHours, " h"), "blue"],
+      ["Conformidade de SLA ativo", number(data.slaCompliance, "%"), data.slaCompliance !== null && data.slaCompliance < 90 ? "red" : "green"],
+    ];
+    const attention = [
+      data.unassigned ? `${data.unassigned} chamado(s) ativo(s) sem atendente atribuído.` : "",
+      data.breached ? `${data.breached} prazo(s) de SLA vencido(s) no backlog monitorado.` : "",
+      data.atRisk ? `${data.atRisk} prazo(s) de SLA em risco.` : "",
+      data.urgentActive ? `${data.urgentActive} chamado(s) ativo(s) de prioridade alta ou urgente.` : "",
+      data.pendingApproval ? `${data.pendingApproval} chamado(s) aguardando aprovação.` : "",
+      data.reopenedCount ? `${data.reopenedCount} reabertura(s) registrada(s) no período.` : "",
+    ].filter(Boolean);
+    const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Relatório gerencial TicketFlow</title><style>
+      :root{--ink:#172033;--muted:#64748b;--line:#e2e8f0;--accent:#ed1b36;--paper:#fff;--bg:#f1f5f9}*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.5 Inter,Segoe UI,Arial,sans-serif;color:var(--ink)}.page{max-width:1120px;margin:24px auto;background:var(--paper);padding:42px 48px;box-shadow:0 8px 30px #0f172a12}.top{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid var(--accent);padding-bottom:24px}.eyebrow{color:var(--accent);font-size:11px;font-weight:800;letter-spacing:2px}.top h1{font-size:30px;margin:7px 0}.muted{color:var(--muted)}.meta{text-align:right;font-size:12px;color:var(--muted)}.actions{display:flex;justify-content:flex-end;margin:16px 0}.actions button{border:0;border-radius:8px;background:var(--accent);color:white;padding:11px 18px;font-weight:700;cursor:pointer}.section{margin-top:30px;break-inside:avoid}.section h2{font-size:18px;margin:0 0 14px;border-bottom:1px solid var(--line);padding-bottom:9px}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.metric{border:1px solid var(--line);border-radius:10px;padding:16px;border-top:3px solid #3b82f6}.metric.green{border-top-color:#10b981}.metric.amber{border-top-color:#f59e0b}.metric.red{border-top-color:#ef4444}.metric.purple{border-top-color:#8b5cf6}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;font-size:25px;margin-top:5px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px}.bar-row{display:grid;grid-template-columns:130px 1fr 34px;gap:10px;align-items:center;margin:12px 0}.bar-label{font-size:12px}.bar-track{height:12px;background:#f1f5f9;border-radius:20px;overflow:hidden}.bar-fill{height:100%;border-radius:20px}.bar-row strong{text-align:right;font-size:12px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#f1f5f9;text-align:left;font-weight:700}th,td{padding:10px;border-bottom:1px solid var(--line)}.empty{text-align:center;color:var(--muted)}.notice{padding:16px;border-radius:8px;background:#fff7ed;border:1px solid #fed7aa}.notice.good{background:#f0fdf4;border-color:#bbf7d0}.notice ul{margin:8px 0 0;padding-left:20px}.foot{margin-top:36px;padding-top:14px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;justify-content:space-between}@media(max-width:700px){.page{margin:0;padding:22px}.top,.grid2{display:block}.meta{text-align:left;margin-top:14px}.cards{grid-template-columns:repeat(2,1fr)}}@media print{@page{size:A4;margin:12mm}body{background:#fff;font-size:11px}.page{margin:0;padding:0;max-width:none;box-shadow:none}.actions{display:none}.section{margin-top:22px}.metric{padding:10px}.metric strong{font-size:20px}.top h1{font-size:25px}.cards{gap:8px}.grid2{gap:16px}th,td{padding:7px;print-color-adjust:exact;-webkit-print-color-adjust:exact}.bar-track,.bar-fill,.metric,th{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><main class="page">
+      <header class="top"><div><div class="eyebrow">TICKETFLOW · GESTÃO DE OPERAÇÕES</div><h1>Relatório gerencial de chamados</h1><div class="muted">Visão executiva de volume, eficiência, atendimento e cumprimento de prazos.</div></div><div class="meta"><strong>Período:</strong> ${escapeHtml(periodLabel)}<br><strong>Setor:</strong> ${escapeHtml(departmentLabel)}<br><strong>Equipe:</strong> ${escapeHtml(teamLabel)}<br><strong>Gerado em:</strong> ${new Date().toLocaleString("pt-BR")}</div></header>
+      <div class="actions"><button onclick="window.print()">Imprimir / Salvar em PDF</button></div>
+      <section class="section"><h2>1. Resumo executivo</h2><div class="cards">${summary.map(([label,value,tone]) => `<div class="metric ${tone}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}</div></section>
+      <section class="section grid2"><div><h2>2. Situação dos chamados</h2>${barRows(data.statusData)}</div><div><h2>3. Distribuição por prioridade</h2>${barRows(data.priorityData)}</div></section>
+      <section class="section"><h2>4. Desempenho por atendente</h2>${table(["Atendente","Vinculados","Ativos","Resolvidos","Encerrados","Média até resolução (h)"],data.assigneeBreakdown.map(item=>[item.name,item.linked,item.active,item.resolved,item.closed,item.avgHours===null?"N/D":item.avgHours.toLocaleString("pt-BR",{maximumFractionDigits:1})]))}<p class="muted">Observação: a distribuição considera o atendente atualmente vinculado ao chamado, não necessariamente todas as pessoas que participaram do fluxo.</p></section>
+      <section class="section grid2"><div><h2>5. Desempenho por setor</h2>${table(["Setor","Recebidos","Ativos","Encerrados","Média (h)"],data.departmentBreakdown.map(item=>[item.name,item.total,item.active,item.closed,item.avgHours===null?"N/D":item.avgHours.toLocaleString("pt-BR",{maximumFractionDigits:1})]))}</div><div><h2>6. Desempenho por equipe</h2>${table(["Equipe","Recebidos","Ativos","Encerrados","Média (h)"],data.teamBreakdown.map(item=>[item.name,item.total,item.active,item.closed,item.avgHours===null?"N/D":item.avgHours.toLocaleString("pt-BR",{maximumFractionDigits:1})]))}</div></section>
+      <section class="section"><h2>7. Qualidade do fluxo e pontos de atenção</h2><div class="notice ${attention.length ? "" : "good"}"><strong>${attention.length ? "Pontos que merecem acompanhamento" : "Nenhum alerta automático identificado nos indicadores atuais"}</strong>${attention.length ? `<ul>${attention.map(item=>`<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "<p>Não há chamados ativos sem responsável, prazos vencidos ou em risco, prioridades altas/urgentes ativas ou aprovações pendentes nos dados filtrados.</p>"}</div><div class="grid2" style="margin-top:18px"><div><strong>Chamados reabertos</strong><p>${data.reopenedCount}</p><strong>Tempo médio de validação do solicitante</strong><p>${data.averageRequesterValidationHours===null?"N/D":number(data.averageRequesterValidationHours," h")}</p></div><div><strong>Prazos vencidos</strong><p>${data.breached}</p><strong>Prazos em risco</strong><p>${data.atRisk}</p><strong>Chamados sem atendente</strong><p>${data.unassigned}</p></div></div></section>
+      <footer class="foot"><span>TicketFlow · Relatório gerencial</span><span>Documento gerado com base nos filtros e dados disponíveis no momento da exportação.</span></footer></main></body></html>`;
+    const blob = new Blob(["\\uFEFF", html], { type: "text/html;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ticketflow-relatorio-gerencial-${new Date().toISOString().slice(0, 10)}.html`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const exportCsv = () => {
     const rows: string[][] = [
       ["Tipo", "Indicador", "Valor"],
@@ -246,6 +293,7 @@ export default function KPIs() {
           <p className="mt-2 max-w-2xl text-sm text-[var(--app-muted-foreground)]">Visão ponta a ponta: entrada, atendimento, aprovação, resolução, validação do solicitante e cumprimento de SLA.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={exportManagementReport} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#ed1b36] px-3 text-sm font-semibold text-white transition-colors hover:opacity-90"><Download className="size-4" />Relatório gerencial</button>
           <button type="button" onClick={exportCsv} className="inline-flex h-10 items-center gap-2 rounded-md border border-[var(--app-border)] px-3 text-sm font-medium transition-colors hover:bg-[var(--app-muted)]"><Download className="size-4" />Exportar CSV</button>
           <div className="flex items-center gap-2"><span className="text-xs text-[var(--app-muted-foreground)]">Setor</span>
             <Select value={departmentFilter} onValueChange={value => { setDepartmentFilter(value); setTeamFilter("all"); }}>
