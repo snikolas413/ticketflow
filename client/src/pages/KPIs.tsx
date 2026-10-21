@@ -52,6 +52,7 @@ export default function KPIs() {
   const [period, setPeriod] = useState<Period>("30");
   const ticketsQuery = trpc.tickets.list.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000 });
   const policiesQuery = trpc.tickets.slaPolicies.useQuery(undefined, { enabled: Boolean(user), staleTime: 60_000 });
+  const workflowEventsQuery = trpc.tickets.workflowEvents.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000 });
   const rows = ticketsQuery.data ?? [];
 
   const data = useMemo(() => {
@@ -75,7 +76,40 @@ export default function KPIs() {
     const unassigned = active.filter(ticket => !ticket.assigneeId).length;
     const urgentActive = active.filter(ticket => ticket.priority === "urgent" || ticket.priority === "high").length;
     const pendingApproval = tickets.filter(ticket => ticket.approvalStatus === "pending").length;
-    const reopenedOrReopenedProxy = tickets.filter(ticket => ticket.status === "in_progress" && ticket.resolvedAt).length;
+
+    const ticketIds = new Set(tickets.map(ticket => ticket.id));
+    const workflowEvents = (workflowEventsQuery.data ?? [])
+      .filter(event => ticketIds.has(event.ticketId))
+      .map(event => {
+        let payload: { from?: string; to?: string } = {};
+        try { payload = JSON.parse(event.payload) as { from?: string; to?: string }; } catch { /* Ignore malformed legacy events. */ }
+        return { ...event, payload };
+      });
+    const reopenedCount = workflowEvents.filter(event => event.payload.from === "resolved" && event.payload.to === "in_progress").length;
+    const requesterValidationDurations: number[] = [];
+    const eventsByTicket = new Map<number, typeof workflowEvents>();
+    for (const event of workflowEvents) {
+      const list = eventsByTicket.get(event.ticketId) ?? [];
+      list.push(event);
+      eventsByTicket.set(event.ticketId, list);
+    }
+    for (const events of eventsByTicket.values()) {
+      let lastResolvedAt: number | null = null;
+      for (const event of events) {
+        const timestamp = new Date(event.createdAt).getTime();
+        if (!Number.isFinite(timestamp)) continue;
+        if (event.payload.to === "resolved") lastResolvedAt = timestamp;
+        if (event.payload.from === "resolved" && event.payload.to === "closed" && lastResolvedAt !== null && timestamp >= lastResolvedAt) {
+          requesterValidationDurations.push((timestamp - lastResolvedAt) / 3_600_000);
+          lastResolvedAt = null;
+        }
+        if (event.payload.from === "resolved" && event.payload.to === "in_progress") lastResolvedAt = null;
+      }
+    }
+    const averageRequesterValidationHours = requesterValidationDurations.length
+      ? requesterValidationDurations.reduce((sum, hours) => sum + hours, 0) / requesterValidationDurations.length
+      : null;
+
 
     let breached = 0;
     let monitored = 0;
@@ -119,11 +153,11 @@ export default function KPIs() {
       inProgress: count("in_progress"), waiting: count("waiting_requester"), resolved: count("resolved"), closed: count("closed"),
       resolutionRate: tickets.length ? Math.round(completed.length / tickets.length * 100) : 0,
       responseRate: tickets.length ? Math.round(responded.length / tickets.length * 100) : 0,
-      averageResolutionHours, unassigned, urgentActive, pendingApproval, breached, monitored, atRisk,
+      averageResolutionHours, averageRequesterValidationHours, reopenedCount, unassigned, urgentActive, pendingApproval, breached, monitored, atRisk,
       slaCompliance: monitored ? Math.round((monitored - breached) / monitored * 100) : null,
-      statusData, priorityData, trend, reopenedOrReopenedProxy,
+      statusData, priorityData, trend,
     };
-  }, [rows, period, policiesQuery.data]);
+  }, [rows, period, policiesQuery.data, workflowEventsQuery.data]);
 
   if (loading) return <div className="p-10 text-sm text-[var(--app-muted-foreground)]">Carregando indicadores…</div>;
   if (!user) return <div className="p-10 text-sm">Entre no TicketFlow para acessar os KPIs.</div>;
@@ -145,8 +179,8 @@ export default function KPIs() {
         </div>
       </div>
 
-      {(ticketsQuery.isLoading || policiesQuery.isLoading) && <div className="text-xs text-[var(--app-muted-foreground)]">Atualizando indicadores…</div>}
-      {(ticketsQuery.isError || policiesQuery.isError) && <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-500">Não foi possível carregar todos os indicadores. Atualize a página ou tente novamente.</div>}
+      {(ticketsQuery.isLoading || policiesQuery.isLoading || workflowEventsQuery.isLoading) && <div className="text-xs text-[var(--app-muted-foreground)]">Atualizando indicadores…</div>}
+      {(ticketsQuery.isError || policiesQuery.isError || workflowEventsQuery.isError) && <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-500">Não foi possível carregar todos os indicadores. Atualize a página ou tente novamente.</div>}
 
       <section>
         <div className="mb-3 flex items-center gap-2"><Gauge className="size-4 text-[#ed1b36]" /><h2 className="text-sm font-semibold">Resumo executivo</h2><Badge variant="outline">{data.total} chamados no período</Badge></div>
@@ -155,6 +189,16 @@ export default function KPIs() {
           <MetricCard title="Backlog ativo" value={data.active} detail="Abertos, em atendimento ou aguardando" icon={Workflow} tone="amber" />
           <MetricCard title="Resolvidos ou encerrados" value={data.completed} detail={`${data.resolutionRate}% do volume do período`} icon={CheckCircle2} tone="green" />
           <MetricCard title="Tempo médio até resolução" value={data.averageResolutionHours === null ? "N/D" : `${data.averageResolutionHours.toFixed(1)} h`} detail="Somente chamados com resolvedAt válido" icon={Timer} tone="purple" />
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-center gap-2"><RefreshCw className="size-4 text-[#ed1b36]" /><h2 className="text-sm font-semibold">Validação do solicitante</h2></div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard title="Chamados reabertos" value={data.reopenedCount} detail="Eventos reais de reabertura no período" icon={RefreshCw} tone="amber" />
+          <MetricCard title="Tempo médio de validação" value={data.averageRequesterValidationHours === null ? "N/D" : data.averageRequesterValidationHours.toFixed(1) + " h"} detail="Da resolução até o encerramento pelo solicitante" icon={Timer} tone="purple" />
+          <MetricCard title="Aguardando validação" value={data.resolved} detail="Resolvidos que aguardam ação do solicitante" icon={Users} tone="amber" />
+          <MetricCard title="Encerrados" value={data.closed} detail="Chamados encerrados após validação" icon={CheckCircle2} tone="green" />
         </div>
       </section>
 
@@ -201,7 +245,7 @@ export default function KPIs() {
               { label: "Aguardando aprovação", value: data.pendingApproval, icon: AlertCircle },
               { label: "Primeira resposta registrada", value: `${data.responseRate}%`, icon: RefreshCw },
             ].map(item => <div key={item.label} className="flex items-center justify-between gap-3 border-b border-[var(--app-border)] pb-3 last:border-0 last:pb-0"><div className="flex items-center gap-2 text-sm"><item.icon className="size-4 text-[var(--app-muted-foreground)]" /><span>{item.label}</span></div><strong className="text-sm tabular-nums">{item.value}</strong></div>)}
-            <p className="pt-1 text-[11px] leading-5 text-[var(--app-muted-foreground)]">Os indicadores respeitam o escopo de chamados que o usuário autenticado pode visualizar. Taxas de reabertura e tempo de validação serão adicionadas quando o histórico expuser eventos e carimbos de data específicos para essas etapas.</p>
+            <p className="pt-1 text-[11px] leading-5 text-[var(--app-muted-foreground)]">Os indicadores respeitam o escopo de chamados que o usuário autenticado pode visualizar. Reaberturas e tempo de validação usam o histórico de status; eventos antigos ausentes podem não ser contabilizados.</p>
           </CardContent>
         </Card>
       </section>
