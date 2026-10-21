@@ -73,6 +73,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const updateSet: Record<string, unknown> = {};
   const existingByOpenId = (await db.select({ id: users.id }).from(users).where(eq(users.openId, user.openId)).limit(1))[0];
   const hasAdmin = (await db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1))[0];
+  const hasAnyUser = (await db.select({ id: users.id }).from(users).limit(1))[0];
   const corporateEmail = user.email?.trim().toLowerCase();
   const invitation = corporateEmail
     ? (await db.select().from(userInvitations).where(and(eq(userInvitations.email, corporateEmail), eq(userInvitations.active, 1))).limit(1))[0]
@@ -114,7 +115,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
   if (user.role === undefined && user.openId !== ENV.ownerOpenId) {
     const existingAdmin = (await db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1))[0];
-    if (!existingAdmin) {
+    // Only auto-promote the first-ever account, not a new login when an
+    // older database already contains users but has no administrator.
+    if (!existingAdmin && !hasAnyUser) {
       values.role = "admin";
       updateSet.role = "admin";
     }
@@ -158,8 +161,10 @@ export async function authenticateLocalUser(email: string, password: string) {
 export async function localSetupStatus() {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  const localAccount = (await db.select({ id: users.id, passwordHash: users.passwordHash }).from(users).where(eq(users.active, 1)).limit(100)).find(item => Boolean(item.passwordHash));
-  return { needsSetup: !localAccount };
+  // Setup is allowed only for a completely empty user table. Existing OAuth
+  // accounts must never be converted into local administrators by this flow.
+  const existingUser = (await db.select({ id: users.id }).from(users).limit(1))[0];
+  return { needsSetup: !existingUser };
 }
 
 export async function createInitialLocalAdmin(input: { email: string; password: string; name: string }) {
@@ -169,25 +174,29 @@ export async function createInitialLocalAdmin(input: { email: string; password: 
   const password = input.password.trim();
   const name = input.name.trim();
   if (!email || !name || password.length < 8) throw new Error("Informe nome, e-mail e uma senha com pelo menos 8 caracteres.");
+
   const passwordHash = await hashPassword(password);
-  const existing = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
-  if (existing && existing.passwordHash) throw new Error("A conta local já existe. Entre com o e-mail e a senha cadastrados.");
-  if (existing) {
-    await db.update(users).set({ name, passwordHash, loginMethod: "local", role: "admin", profile: "manager", active: 1, openId: existing.openId || `local:${email}`, updatedAt: new Date() }).where(eq(users.id, existing.id));
-    return (await db.select().from(users).where(eq(users.id, existing.id)).limit(1))[0];
-  }
-  const [createdUser] = await db.insert(users).values({
-    openId: `local:${email}`,
-    name,
-    email,
-    passwordHash,
-    loginMethod: "local",
-    role: "admin",
-    profile: "manager",
-    active: 1,
-    lastSignedIn: new Date(),
-  }).returning({ id: users.id });
-  return (await db.select().from(users).where(eq(users.id, createdUser.id)).limit(1))[0];
+  // Serialize setup attempts so two concurrent requests cannot both create an admin.
+  return db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(741852963)`);
+    const existingUser = (await tx.select({ id: users.id }).from(users).limit(1))[0];
+    if (existingUser) {
+      throw new Error("A configuração inicial já foi concluída. Entre com uma conta existente.");
+    }
+
+    const [createdUser] = await tx.insert(users).values({
+      openId: `local:${email}`,
+      name,
+      email,
+      passwordHash,
+      loginMethod: "local",
+      role: "admin",
+      profile: "manager",
+      active: 1,
+      lastSignedIn: new Date(),
+    }).returning();
+    return createdUser;
+  });
 }
 
 export async function ensureFirstAdmin(user: User) {
@@ -196,6 +205,8 @@ export async function ensureFirstAdmin(user: User) {
   if (user.role === "admin") return user;
   const existingAdmin = (await db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1))[0];
   if (existingAdmin) return user;
+  const otherUser = (await db.select({ id: users.id }).from(users).where(sql`${users.id} <> ${user.id}`).limit(1))[0];
+  if (otherUser) return user;
   await db.update(users).set({ role: "admin", updatedAt: new Date() }).where(eq(users.id, user.id));
   return { ...user, role: "admin" as const };
 }
