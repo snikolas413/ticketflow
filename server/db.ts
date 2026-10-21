@@ -522,11 +522,14 @@ export async function listTicketWorkflowEvents(user: User) {
   return db
     .select({
       ticketId: ticketEvents.ticketId,
+      actorId: ticketEvents.actorId,
+      actorName: users.name,
       eventType: ticketEvents.eventType,
       payload: ticketEvents.payload,
       createdAt: ticketEvents.createdAt,
     })
     .from(ticketEvents)
+    .leftJoin(users, eq(ticketEvents.actorId, users.id))
     .where(and(inArray(ticketEvents.ticketId, ticketIds), eq(ticketEvents.eventType, "ticket.status_changed")))
     .orderBy(asc(ticketEvents.createdAt));
 }
