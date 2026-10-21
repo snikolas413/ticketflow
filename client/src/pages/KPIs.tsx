@@ -155,7 +155,7 @@ export default function KPIs() {
       responseRate: tickets.length ? Math.round(responded.length / tickets.length * 100) : 0,
       averageResolutionHours, averageRequesterValidationHours, reopenedCount, unassigned, urgentActive, pendingApproval, breached, monitored, atRisk,
       slaCompliance: monitored ? Math.round((monitored - breached) / monitored * 100) : null,
-      statusData, priorityData, trend, reopenedOrReopenedProxy,
+      statusData, priorityData, trend,
     };
   }, [rows, period, policiesQuery.data, workflowEventsQuery.data]);
 
