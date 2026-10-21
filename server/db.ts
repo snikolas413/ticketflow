@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
-import { randomBytes, scrypt as nodeScrypt, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scrypt as nodeScrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -246,6 +246,70 @@ export async function createUserInvitation(input: { admin: User; name: string; e
     }
   }
   return (await db.select().from(userInvitations).where(eq(userInvitations.email, email)).limit(1))[0];
+}
+
+export async function updateUserAccount(admin: User, input: { userId: number; name: string; email: string; profile: UserProfile; departmentId?: number | null; teamId?: number | null }) {
+  if (admin.role !== "admin") throw new Error("Only administrators can edit user accounts");
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const email = input.email.trim().toLowerCase();
+  const duplicate = (await db.select({ id: users.id }).from(users).where(and(eq(users.email, email))).limit(1))[0];
+  if (duplicate && duplicate.id !== input.userId) throw new Error("Este e-mail já está cadastrado em outra conta.");
+  if (input.teamId) {
+    const team = (await db.select().from(teams).where(and(eq(teams.id, input.teamId), eq(teams.active, 1))).limit(1))[0];
+    if (!team || (input.departmentId && team.departmentId !== input.departmentId)) throw new Error("A equipe selecionada não pertence ao setor informado.");
+  }
+  await db.update(users).set({
+    name: input.name.trim(), email, profile: input.profile,
+    departmentId: input.departmentId ?? null, teamId: input.teamId ?? null, updatedAt: new Date(),
+  }).where(eq(users.id, input.userId));
+  return (await db.select().from(users).where(eq(users.id, input.userId)).limit(1))[0];
+}
+
+async function ensurePasswordResetTable(db: Awaited<ReturnType<typeof getDb>>) {
+  if (!db) throw new Error("Database is not available");
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS ticketflow_password_reset_tokens (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+}
+
+export async function createPasswordResetToken(email: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await ensurePasswordResetTable(db);
+  const normalized = email.trim().toLowerCase();
+  const user = (await db.select({ id: users.id, email: users.email }).from(users)
+    .where(and(eq(users.email, normalized), eq(users.active, 1))).limit(1))[0];
+  if (!user?.email) return null;
+  const recent = await db.execute(sql`SELECT COUNT(*)::int AS count FROM ticketflow_password_reset_tokens
+    WHERE user_id = ${user.id} AND created_at > NOW() - INTERVAL '10 minutes'`);
+  const recentRows = (recent as unknown as { rows?: Array<{ count: number }> }).rows ?? [];
+  if ((recentRows[0]?.count ?? 0) >= 3) return null;
+  const token = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  await db.execute(sql`DELETE FROM ticketflow_password_reset_tokens WHERE user_id = ${user.id}`);
+  await db.execute(sql`INSERT INTO ticketflow_password_reset_tokens (user_id, token_hash, expires_at)
+    VALUES (${user.id}, ${tokenHash}, NOW() + INTERVAL '30 minutes')`);
+  return { email: user.email, token };
+}
+
+export async function consumePasswordResetToken(token: string, password: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await ensurePasswordResetTable(db);
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const result = await db.execute(sql`DELETE FROM ticketflow_password_reset_tokens
+    WHERE token_hash = ${tokenHash} AND expires_at > NOW() RETURNING user_id`);
+  const rows = (result as unknown as { rows?: Array<{ user_id: number }> }).rows ?? [];
+  const userId = rows[0]?.user_id;
+  if (!userId) return false;
+  const passwordHash = await hashPassword(password);
+  await db.update(users).set({ passwordHash, loginMethod: "local", updatedAt: new Date() }).where(and(eq(users.id, userId), eq(users.active, 1)));
+  return true;
 }
 
 export async function setUserActive(admin: User, userId: number, active: boolean) {

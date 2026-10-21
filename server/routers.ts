@@ -1,12 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { authenticateLocalUser, clearCatalogAndTickets, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listTicketWorkflowEvents, listTicketAssigneeNames, listUsersForAdmin, listSlaPolicies, updateSlaPolicy, localSetupStatus, markNotificationRead, replaceManagerScopes, setUserActive, setUserProfile, transitionTicket, updateServiceRouting } from "./db";
+import { authenticateLocalUser, clearCatalogAndTickets, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listTicketWorkflowEvents, listTicketAssigneeNames, listUsersForAdmin, listSlaPolicies, updateSlaPolicy, localSetupStatus, markNotificationRead, replaceManagerScopes, setUserActive, setUserProfile, transitionTicket, updateServiceRouting, updateUserAccount, createPasswordResetToken, consumePasswordResetToken } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 import { PRIORITIES, TICKET_STATUSES } from "@shared/ticket-types";
+import { sendPasswordResetEmail } from "./_core/gmail";
 
 const ticketInput = z.object({
   title: z.string().trim().min(4).max(180),
@@ -43,6 +44,23 @@ export const appRouter = router({
       const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "", expiresInMs: 1000 * 60 * 60 * 12 });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 12 });
       return { id: user.id, name: user.name, email: user.email, role: user.role, profile: user.profile };
+    }),
+    requestPasswordReset: publicProcedure.input(z.object({ email: z.string().email().max(320) })).mutation(async ({ input }) => {
+      try {
+        const request = await createPasswordResetToken(input.email);
+        if (request) {
+          const baseUrl = (process.env.APP_BASE_URL ?? "https://ticketflow-j2e5.onrender.com").replace(/\/$/, "");
+          await sendPasswordResetEmail(request.email, `${baseUrl}/reset-password?token=${encodeURIComponent(request.token)}`);
+        }
+      } catch (error) {
+        console.error("[Password reset] Request could not be completed:", error instanceof Error ? error.message : "unknown error");
+      }
+      return { success: true, message: "Se o e-mail estiver cadastrado, você receberá instruções para redefinir a senha." } as const;
+    }),
+    resetPassword: publicProcedure.input(z.object({ token: z.string().regex(/^[a-f0-9]{64}$/i), password: z.string().min(8).max(200) })).mutation(async ({ input }) => {
+      const success = await consumePasswordResetToken(input.token, input.password);
+      if (!success) throw new TRPCError({ code: "BAD_REQUEST", message: "Link inválido ou expirado. Solicite uma nova recuperação de senha." });
+      return { success: true } as const;
     }),
     login: publicProcedure.input(z.object({ email: z.string().email().max(320), password: z.string().min(1).max(200) })).mutation(async ({ ctx, input }) => {
       const user = await authenticateLocalUser(input.email, input.password);
@@ -89,6 +107,18 @@ export const appRouter = router({
     updateSlaPolicy: protectedProcedure.input(z.object({ priority: z.enum(PRIORITIES), firstResponseHours: z.number().positive().max(8760), resolutionHours: z.number().positive().max(8760) })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return updateSlaPolicy({ actorId: ctx.user.id, ...input }); }),
     users: protectedProcedure.query(({ ctx }) => { adminOnly(ctx.user.role); return listUsersForAdmin(ctx.user); }),
     createUser: protectedProcedure.input(z.object({ name: z.string().trim().min(1).max(160), email: z.string().email().max(320), password: z.string().min(8).max(200), profile: profileInput, departmentId: z.number().int().positive().optional(), teamId: z.number().int().positive().optional() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return createUserInvitation({ admin: ctx.user, ...input }); }),
+    updateUser: protectedProcedure.input(z.object({ userId: z.number().int().positive(), name: z.string().trim().min(1).max(160), email: z.string().email().max(320), profile: profileInput, departmentId: z.number().int().positive().nullable().optional(), teamId: z.number().int().positive().nullable().optional() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return updateUserAccount(ctx.user, input); }),
+    sendPasswordReset: protectedProcedure.input(z.object({ userId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      adminOnly(ctx.user.role);
+      const target = (await listUsersForAdmin(ctx.user)).find(user => user.id === input.userId);
+      if (!target?.email || target.active !== 1) throw new TRPCError({ code: "BAD_REQUEST", message: "Usuário sem e-mail cadastrado ou inativo." });
+      const request = await createPasswordResetToken(target.email);
+      if (!request) throw new TRPCError({ code: "BAD_REQUEST", message: "Não foi possível criar o link de recuperação." });
+      const baseUrl = (process.env.APP_BASE_URL ?? "https://ticketflow-j2e5.onrender.com").replace(/\/$/, "");
+      await sendPasswordResetEmail(request.email, `${baseUrl}/reset-password?token=${encodeURIComponent(request.token)}`);
+      return { success: true };
+    }),
+
     setProfile: protectedProcedure.input(z.object({ userId: z.number().int().positive(), profile: profileInput })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return setUserProfile(ctx.user, input.userId, input.profile); }),
     setActive: protectedProcedure.input(z.object({ userId: z.number().int().positive(), active: z.boolean() })).mutation(({ ctx, input }) => { adminOnly(ctx.user.role); return setUserActive(ctx.user, input.userId, input.active); }),
     managerScopes: protectedProcedure.input(z.object({ userId: z.number().int().positive() })).query(({ ctx, input }) => { adminOnly(ctx.user.role); return listManagerScopes(ctx.user, input.userId); }),
