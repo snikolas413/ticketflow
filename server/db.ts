@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
 import { randomBytes, scrypt as nodeScrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -502,6 +502,24 @@ export async function listTickets(user: User, filters: TicketFilters = {}) {
     .from(tickets)
     .where(clauses.length ? and(...clauses) : undefined)
     .orderBy(desc(tickets.updatedAt));
+}
+
+export async function listTicketWorkflowEvents(user: User) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const visibleTickets = await listTickets(user);
+  const ticketIds = visibleTickets.map(ticket => ticket.id);
+  if (!ticketIds.length) return [];
+  return db
+    .select({
+      ticketId: ticketEvents.ticketId,
+      eventType: ticketEvents.eventType,
+      payload: ticketEvents.payload,
+      createdAt: ticketEvents.createdAt,
+    })
+    .from(ticketEvents)
+    .where(and(inArray(ticketEvents.ticketId, ticketIds), eq(ticketEvents.eventType, "ticket.status_changed")))
+    .orderBy(asc(ticketEvents.createdAt));
 }
 
 export async function getTicketForUser(user: User, ticketId: number) {
