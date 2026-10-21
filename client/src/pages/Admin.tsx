@@ -53,6 +53,12 @@ export default function Admin() {
   const [userProfile, setUserProfile] = useState<Profile>("requester");
   const [userDepartmentId, setUserDepartmentId] = useState<number>();
   const [userTeamId, setUserTeamId] = useState<number>();
+  const [editingUserId, setEditingUserId] = useState<number>();
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editProfile, setEditProfile] = useState<Profile>("requester");
+  const [editDepartmentId, setEditDepartmentId] = useState<number>();
+  const [editTeamId, setEditTeamId] = useState<number>();
   const [managerUserId, setManagerUserId] = useState<number>();
   const [managerDepartmentId, setManagerDepartmentId] = useState<number>();
   const [managerTeamId, setManagerTeamId] = useState<number>();
@@ -80,6 +86,7 @@ export default function Admin() {
   const createService = trpc.catalog.createService.useMutation({ onSuccess: () => { toast.success("Serviço criado com regras de roteamento"); setServiceName(""); setServiceCode(""); setServiceCategoryId(undefined); setServiceDefaultTicketTypeId(undefined); setServiceDefaultQueueId(undefined); void services.refetch(); }, onError: error => toast.error(error.message) });
   const updateServiceRouting = trpc.catalog.updateServiceRouting.useMutation({ onSuccess: () => { toast.success("Regras de roteamento salvas"); setServiceRuleDrafts({}); void services.refetch(); void audit.refetch(); }, onError: error => toast.error(error.message) });
   const createUser = trpc.admin.createUser.useMutation({ onSuccess: () => { toast.success("Usuário criado e pronto para login"); setUserName(""); setUserEmail(""); setUserPassword(""); setUserDepartmentId(undefined); setUserTeamId(undefined); void users.refetch(); }, onError: error => toast.error(error.message) });
+  const updateUser = trpc.admin.updateUser.useMutation({ onSuccess: () => { toast.success("Dados do usuário atualizados"); setEditingUserId(undefined); void users.refetch(); void audit.refetch(); }, onError: error => toast.error(error.message) });
   const setProfile = trpc.admin.setProfile.useMutation({ onSuccess: () => { toast.success("Perfil atualizado"); void users.refetch(); }, onError: error => toast.error(error.message) });
   const setUserActive = trpc.admin.setActive.useMutation({ onSuccess: () => { toast.success("Acesso atualizado"); void users.refetch(); }, onError: error => toast.error(error.message) });
   const setManagerScopes = trpc.admin.setManagerScopes.useMutation({ onSuccess: () => { toast.success("Escopo do gestor atualizado"); void managerScopes.refetch(); }, onError: error => toast.error(error.message) });
@@ -233,6 +240,7 @@ export default function Admin() {
                     <p className="mt-1 text-[11px] text-[var(--app-muted-foreground)]">{departments.data?.find(department => department.id === account.departmentId)?.name ?? "Sem setor"}{account.teamId ? ` · ${teams.data?.find(team => team.id === account.teamId)?.name ?? "Equipe"}` : ""}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => { setEditingUserId(account.id); setEditName(account.name ?? ""); setEditEmail(account.email ?? ""); setEditProfile(account.profile); setEditDepartmentId(account.departmentId ?? undefined); setEditTeamId(account.teamId ?? undefined); }}>Editar dados</Button>
                     {account.role === "admin" && <Badge variant="outline">Administrador</Badge>}
                     <select aria-label={`Perfil de ${account.email ?? account.id}`} className="h-9 rounded-md border border-input bg-background px-2 text-xs" value={account.profile} onChange={event => setProfile.mutate({ userId: account.id, profile: event.target.value as Profile })} disabled={setProfile.isPending}>
                       {Object.entries(profileLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -242,6 +250,14 @@ export default function Admin() {
                     </Button>
                     <Badge variant="outline" className={account.active === 1 ? "border-[#b9e7d2] text-[#147b55]" : "border-[var(--app-border)] text-[var(--app-muted-foreground)]"}>{account.active === 1 ? "Ativo" : "Inativo"}</Badge>
                   </div>
+                  {editingUserId === account.id && <div className="mt-3 grid w-full gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-secondary)] p-3 sm:grid-cols-2">
+                    <Input aria-label="Nome do usuário" value={editName} onChange={event => setEditName(event.target.value)} placeholder="Nome completo" />
+                    <Input aria-label="E-mail do usuário" type="email" value={editEmail} onChange={event => setEditEmail(event.target.value)} placeholder="E-mail" />
+                    <select aria-label="Perfil do usuário" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={editProfile} onChange={event => setEditProfile(event.target.value as Profile)}>{Object.entries(profileLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>
+                    <select aria-label="Setor do usuário" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={editDepartmentId ?? ""} onChange={event => { setEditDepartmentId(event.target.value ? Number(event.target.value) : undefined); setEditTeamId(undefined); }}><option value="">Sem setor</option>{(departments.data ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select>
+                    <select aria-label="Equipe do usuário" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={editTeamId ?? ""} onChange={event => setEditTeamId(event.target.value ? Number(event.target.value) : undefined)}><option value="">Sem equipe</option>{(teams.data ?? []).filter(team => !editDepartmentId || team.departmentId === editDepartmentId).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+                    <div className="flex gap-2"><Button size="sm" disabled={updateUser.isPending || !editName.trim() || !editEmail.trim()} onClick={() => updateUser.mutate({ userId: account.id, name: editName, email: editEmail, profile: editProfile, departmentId: editDepartmentId ?? null, teamId: editTeamId ?? null })}>{updateUser.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}Salvar alterações</Button><Button size="sm" variant="outline" onClick={() => setEditingUserId(undefined)}>Cancelar</Button></div>
+                  </div>}
                 </div>)}
               </div>}
             </CardContent>
