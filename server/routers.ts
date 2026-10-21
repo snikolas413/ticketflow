@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { authenticateLocalUser, clearCatalogAndTickets, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listTicketWorkflowEvents, listUsersForAdmin, listSlaPolicies, updateSlaPolicy, localSetupStatus, markNotificationRead, replaceManagerScopes, setUserActive, setUserProfile, transitionTicket, updateServiceRouting } from "./db";
+import { authenticateLocalUser, clearCatalogAndTickets, createAiRequest, addComment, allowedTransitions, assignTicket, claimTicket, completeAiRequest, createDepartment, createInitialLocalAdmin, createQueue, createService, createServiceCategory, createTeam, createTicket, createTicketType, createUserInvitation, decideApproval, ensureFirstAdmin, getFoundationSummary, failAiRequest, getAttachmentDownload, getTicketAttachments, getTicketComments, getTicketEvents, getTicketForUser, listAllAttachments, listApprovals, listApproverUsers, listAuditLogs, listDepartments, listManagerScopes, listNotifications, listQueuesForAdmin, listServiceCategories, listServices, listTeamsForAdmin, listTicketTypes, listTickets, listTicketWorkflowEvents, listTicketAssigneeNames, listUsersForAdmin, listSlaPolicies, updateSlaPolicy, localSetupStatus, markNotificationRead, replaceManagerScopes, setUserActive, setUserProfile, transitionTicket, updateServiceRouting } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { COOKIE_NAME } from "@shared/const";
@@ -114,6 +114,7 @@ export const appRouter = router({
   tickets: router({
     slaPolicies: protectedProcedure.query(() => listSlaPolicies()),
     workflowEvents: protectedProcedure.query(({ ctx }) => listTicketWorkflowEvents(ctx.user)),
+    assigneeNames: protectedProcedure.query(({ ctx }) => listTicketAssigneeNames(ctx.user)),
     list: protectedProcedure.input(z.object({
       search: z.string().trim().max(80).optional(),
       status: z.enum(TICKET_STATUSES).optional(),

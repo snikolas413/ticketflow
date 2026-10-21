@@ -57,6 +57,7 @@ export default function KPIs() {
   const ticketsQuery = trpc.tickets.list.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000 });
   const policiesQuery = trpc.tickets.slaPolicies.useQuery(undefined, { enabled: Boolean(user), staleTime: 60_000 });
   const workflowEventsQuery = trpc.tickets.workflowEvents.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000 });
+  const assigneeNamesQuery = trpc.tickets.assigneeNames.useQuery(undefined, { enabled: Boolean(user), staleTime: 60_000 });
   const rows = ticketsQuery.data ?? [];
 
   const data = useMemo(() => {
@@ -142,6 +143,20 @@ export default function KPIs() {
       }
     }
 
+    const assigneeNames = new Map((assigneeNamesQuery.data ?? []).map(item => [item.id, item.name?.trim() || "Usuário sem nome"]));
+    const assigneeGroups = new Map<number, typeof tickets>();
+    for (const ticket of tickets) {
+      if (ticket.assigneeId == null) continue;
+      const group = assigneeGroups.get(ticket.assigneeId) ?? [];
+      group.push(ticket);
+      assigneeGroups.set(ticket.assigneeId, group);
+    }
+    const assigneeBreakdown = Array.from(assigneeGroups.entries()).map(([id, group]) => {
+      const resolved = group.filter(ticket => ticket.resolvedAt && new Date(ticket.resolvedAt).getTime() >= new Date(ticket.createdAt).getTime());
+      const avgHours = resolved.length ? resolved.reduce((sum, ticket) => sum + (new Date(ticket.resolvedAt!).getTime() - new Date(ticket.createdAt).getTime()), 0) / resolved.length / 3_600_000 : null;
+      return { id, name: assigneeNames.get(id) ?? "Atendente", linked: group.length, active: group.filter(ticket => ticket.status !== "resolved" && ticket.status !== "closed").length, resolved: group.filter(ticket => ticket.status === "resolved").length, closed: group.filter(ticket => ticket.status === "closed").length, avgHours };
+    }).sort((a, b) => b.linked - a.linked || a.name.localeCompare(b.name));
+
     const departmentNames = new Map((departmentsQuery.data ?? []).map(item => [item.id, item.name]));
     const teamNames = new Map((teamsQuery.data ?? []).map(item => [item.id, item.name]));
     const buildBreakdown = (key: "departmentId" | "teamId", names: Map<number, string>) => {
@@ -183,9 +198,9 @@ export default function KPIs() {
       responseRate: tickets.length ? Math.round(responded.length / tickets.length * 100) : 0,
       averageResolutionHours, averageRequesterValidationHours, reopenedCount, unassigned, urgentActive, pendingApproval, breached, monitored, atRisk,
       slaCompliance: monitored ? Math.round((monitored - breached) / monitored * 100) : null,
-      statusData, priorityData, trend, departmentBreakdown, teamBreakdown,
+      statusData, priorityData, trend, departmentBreakdown, teamBreakdown, assigneeBreakdown,
     };
-  }, [rows, period, departmentFilter, teamFilter, departmentsQuery.data, teamsQuery.data, policiesQuery.data, workflowEventsQuery.data]);
+  }, [rows, period, departmentFilter, teamFilter, departmentsQuery.data, teamsQuery.data, assigneeNamesQuery.data, policiesQuery.data, workflowEventsQuery.data]);
 
   if (loading) return <div className="p-10 text-sm text-[var(--app-muted-foreground)]">Carregando indicadores…</div>;
   if (!user) return <div className="p-10 text-sm">Entre no TicketFlow para acessar os KPIs.</div>;
@@ -219,8 +234,8 @@ export default function KPIs() {
         </div>
       </div>
 
-      {(ticketsQuery.isLoading || policiesQuery.isLoading || workflowEventsQuery.isLoading || departmentsQuery.isLoading || teamsQuery.isLoading) && <div className="text-xs text-[var(--app-muted-foreground)]">Atualizando indicadores…</div>}
-      {(ticketsQuery.isError || policiesQuery.isError || workflowEventsQuery.isError || departmentsQuery.isError || teamsQuery.isError) && <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-500">Não foi possível carregar todos os indicadores. Atualize a página ou tente novamente.</div>}
+      {(ticketsQuery.isLoading || policiesQuery.isLoading || workflowEventsQuery.isLoading || assigneeNamesQuery.isLoading || departmentsQuery.isLoading || teamsQuery.isLoading) && <div className="text-xs text-[var(--app-muted-foreground)]">Atualizando indicadores…</div>}
+      {(ticketsQuery.isError || policiesQuery.isError || workflowEventsQuery.isError || assigneeNamesQuery.isError || departmentsQuery.isError || teamsQuery.isError) && <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-500">Não foi possível carregar todos os indicadores. Atualize a página ou tente novamente.</div>}
 
       <section>
         <div className="mb-3 flex items-center gap-2"><Gauge className="size-4 text-[#ed1b36]" /><h2 className="text-sm font-semibold">Resumo executivo</h2><Badge variant="outline">{data.total} chamados no período</Badge></div>
@@ -232,6 +247,14 @@ export default function KPIs() {
         </div>
       </section>
 
+
+      <section>
+        <div className="mb-3 flex items-center gap-2"><Users className="size-4 text-[#ed1b36]" /><h2 className="text-sm font-semibold">Desempenho por atendente</h2></div>
+        <Card className="border-[var(--app-border)] bg-[var(--app-card)]">
+          <CardHeader><CardTitle className="text-base">Chamados por responsável atual</CardTitle><p className="text-xs text-[var(--app-muted-foreground)]">Atribuição atual do chamado, não necessariamente quem realizou todas as etapas. O tempo médio considera criação até resolução registrada.</p></CardHeader>
+          <CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-[var(--app-border)] text-left text-xs text-[var(--app-muted-foreground)]"><th className="py-2 pr-3">Atendente</th><th className="py-2 px-2 text-right">Vinculados</th><th className="py-2 px-2 text-right">Ativos</th><th className="py-2 px-2 text-right">Resolvidos</th><th className="py-2 px-2 text-right">Encerrados</th><th className="py-2 pl-2 text-right">Média resolução</th></tr></thead><tbody>{data.assigneeBreakdown.length ? data.assigneeBreakdown.map(item => <tr key={item.id} className="border-b border-[var(--app-border)] last:border-0"><td className="py-3 pr-3 font-medium">{item.name}</td><td className="px-2 text-right tabular-nums">{item.linked}</td><td className="px-2 text-right tabular-nums">{item.active}</td><td className="px-2 text-right tabular-nums">{item.resolved}</td><td className="px-2 text-right tabular-nums">{item.closed}</td><td className="pl-2 text-right tabular-nums">{item.avgHours === null ? "N/D" : item.avgHours.toFixed(1) + " h"}</td></tr>) : <tr><td colSpan={6} className="py-6 text-center text-xs text-[var(--app-muted-foreground)]">Sem chamados atribuídos para os filtros selecionados.</td></tr>}</tbody></table></div></CardContent>
+        </Card>
+      </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
         <Card className="border-[var(--app-border)] bg-[var(--app-card)]">
