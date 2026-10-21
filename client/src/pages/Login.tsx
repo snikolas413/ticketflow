@@ -19,8 +19,9 @@ export default function Login() {
     onSuccess: () => { window.location.href = "/"; },
     onError: error => toast.error(error.message),
   });
+  const requestReset = trpc.auth.requestPasswordReset.useMutation({ onSuccess: result => toast.success(result.message), onError: error => toast.error(error.message) });
   const firstAccess = setupStatus.data?.needsSetup === true;
-  const isPending = login.isPending || setup.isPending;
+  const isPending = login.isPending || setup.isPending || requestReset.isPending;
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#090b10] px-4 py-8 text-white sm:px-6">
