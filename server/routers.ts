@@ -46,14 +46,19 @@ export const appRouter = router({
       return { id: user.id, name: user.name, email: user.email, role: user.role, profile: user.profile };
     }),
     requestPasswordReset: publicProcedure.input(z.object({ email: z.string().email().max(320) })).mutation(async ({ input }) => {
+      let stage = "creating reset token";
       try {
         const request = await createPasswordResetToken(input.email);
         if (request) {
+          stage = "sending reset email";
           const baseUrl = (process.env.APP_BASE_URL ?? "https://ticketflow-j2e5.onrender.com").replace(/\/$/, "");
           await sendPasswordResetEmail(request.email, `${baseUrl}/reset-password?token=${encodeURIComponent(request.token)}`);
         }
       } catch (error) {
-        console.error("[Password reset] Request could not be completed:", error instanceof Error ? error.message : "unknown error");
+        const detail = error instanceof Error
+          ? `${error.name}${error.message ? `: ${error.message}` : ""}`
+          : String(error);
+        console.error(`[Password reset] Failed during ${stage}: ${detail}`);
       }
       return { success: true, message: "Se o e-mail estiver cadastrado, você receberá instruções para redefinir a senha." } as const;
     }),

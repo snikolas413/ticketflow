@@ -52,18 +52,27 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   const socket = connectTls({ host: ENV.smtpHost, port: ENV.smtpPort, servername: ENV.smtpHost });
   attachReader(socket);
   socket.setTimeout(15000, () => socket.destroy(new Error("Tempo limite SMTP excedido")));
+  let stage = "TLS connection";
   try {
     await new Promise<void>((resolve, reject) => {
       socket.once("secureConnect", resolve);
       socket.once("error", reject);
     });
+    stage = "SMTP greeting";
     await command(socket, undefined, [220]);
+    stage = "EHLO";
     await command(socket, "EHLO ticketflow", [250]);
+    stage = "SMTP authentication initiation";
     await command(socket, "AUTH LOGIN", [334]);
+    stage = "SMTP username authentication";
     await command(socket, Buffer.from(ENV.smtpUser).toString("base64"), [334]);
+    stage = "SMTP app-password authentication";
     await command(socket, Buffer.from(ENV.smtpPass).toString("base64"), [235]);
+    stage = "sender validation";
     await command(socket, `MAIL FROM:<${ENV.smtpFrom}>`, [250]);
+    stage = "recipient validation";
     await command(socket, `RCPT TO:<${to}>`, [250, 251]);
+    stage = "message submission";
     await command(socket, "DATA", [354]);
     const body = [
       `From: TicketFlow <${ENV.smtpFrom}>`,
@@ -80,8 +89,15 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
       "Se você não solicitou esta alteração, ignore este e-mail.",
       "",
     ].join("\r\n").replace(/\r\n\./g, "\r\n..");
+    stage = "message delivery acceptance";
     await command(socket, body + "\r\n.", [250]);
+    stage = "SMTP session close";
     await command(socket, "QUIT", [221]);
+  } catch (error) {
+    const detail = error instanceof Error
+      ? `${error.name}${error.message ? `: ${error.message}` : ""}`
+      : String(error);
+    throw new Error(`Gmail SMTP failed at ${stage} (${detail})`);
   } finally {
     socket.end();
   }
