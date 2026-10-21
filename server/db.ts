@@ -285,6 +285,10 @@ export async function createPasswordResetToken(email: string) {
   const user = (await db.select({ id: users.id, email: users.email }).from(users)
     .where(and(eq(users.email, normalized), eq(users.active, 1))).limit(1))[0];
   if (!user?.email) return null;
+  const recent = await db.execute(sql`SELECT COUNT(*)::int AS count FROM ticketflow_password_reset_tokens
+    WHERE user_id = ${user.id} AND created_at > NOW() - INTERVAL '10 minutes'`);
+  const recentRows = (recent as unknown as { rows?: Array<{ count: number }> }).rows ?? [];
+  if ((recentRows[0]?.count ?? 0) >= 3) return null;
   const token = randomBytes(32).toString("hex");
   const tokenHash = createHash("sha256").update(token).digest("hex");
   await db.execute(sql`DELETE FROM ticketflow_password_reset_tokens WHERE user_id = ${user.id}`);
