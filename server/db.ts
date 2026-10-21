@@ -809,8 +809,10 @@ export async function transitionTicket(input: { user: User; ticketId: number; st
   await db.update(tickets).set({
     status: input.status,
     updatedAt: new Date(),
-    resolvedAt: input.status === "resolved" ? new Date() : ticket.resolvedAt,
-    closedAt: input.status === "closed" ? new Date() : ticket.closedAt,
+    // Clear lifecycle timestamps when a ticket leaves the corresponding terminal state.
+    // This keeps reopened tickets from carrying stale resolution/closure dates.
+    resolvedAt: input.status === "resolved" ? new Date() : input.status === "closed" ? ticket.resolvedAt : null,
+    closedAt: input.status === "closed" ? new Date() : null,
   }).where(eq(tickets.id, input.ticketId));
   await addEvent(input.ticketId, input.user.id, "ticket.status_changed", { from: ticket.status, to: input.status, comment: input.comment ?? null });
   if (input.comment?.trim()) {
