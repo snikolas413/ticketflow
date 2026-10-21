@@ -12,11 +12,11 @@ function attachReader(socket: TLSSocket) {
     const pending = waiters.get(socket) ?? [];
     while (pending.length) {
       const buffer = buffers.get(socket) ?? "";
-      const lines = buffer.split("\\r\\n");
-      const end = lines.findIndex(line => /^\\d{3} /.test(line));
+      const lines = buffer.split("\r\n");
+      const end = lines.findIndex(line => /^\d{3} /.test(line));
       if (end < 0) break;
-      const reply = lines.slice(0, end + 1).join("\\r\\n");
-      buffers.set(socket, lines.slice(end + 1).join("\\r\\n"));
+      const reply = lines.slice(0, end + 1).join("\r\n");
+      buffers.set(socket, lines.slice(end + 1).join("\r\n"));
       pending.shift()!.resolve(reply);
     }
   });
@@ -28,20 +28,20 @@ function attachReader(socket: TLSSocket) {
 
 function readReply(socket: TLSSocket): Promise<string> {
   const buffer = buffers.get(socket) ?? "";
-  const lines = buffer.split("\\r\\n");
-  const end = lines.findIndex(line => /^\\d{3} /.test(line));
+  const lines = buffer.split("\r\n");
+  const end = lines.findIndex(line => /^\d{3} /.test(line));
   if (end >= 0) {
-    buffers.set(socket, lines.slice(end + 1).join("\\r\\n"));
-    return Promise.resolve(lines.slice(0, end + 1).join("\\r\\n"));
+    buffers.set(socket, lines.slice(end + 1).join("\r\n"));
+    return Promise.resolve(lines.slice(0, end + 1).join("\r\n"));
   }
   return new Promise((resolve, reject) => waiters.get(socket)!.push({ resolve, reject }));
 }
 
 async function command(socket: TLSSocket, value?: string, accepted: number[] = [250]) {
   const replyPromise = readReply(socket);
-  if (value) socket.write(value + "\\r\\n");
+  if (value) socket.write(value + "\r\n");
   const reply = await replyPromise;
-  const code = Number(reply.match(/^(\\d{3})/m)?.[1]);
+  const code = Number(reply.match(/^(\d{3})/m)?.[1]);
   if (!accepted.includes(code)) throw new Error("Gmail SMTP error " + code);
   return reply;
 }
@@ -79,9 +79,8 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
       "",
       "Se você não solicitou esta alteração, ignore este e-mail.",
       "",
-      ".",
-    ].join("\\r\\n").replace(/\\r\\n\\./g, "\\r\\n..");
-    await command(socket, body, [250]);
+    ].join("\r\n").replace(/\r\n\./g, "\r\n..");
+    await command(socket, body + "\r\n.", [250]);
     await command(socket, "QUIT", [221]);
   } finally {
     socket.end();
