@@ -50,6 +50,10 @@ function MetricCard({ title, value, detail, icon: Icon, tone = "blue" }: {
 export default function KPIs() {
   const { user, loading } = useAuth({ redirectOnUnauthenticated: false });
   const [period, setPeriod] = useState<Period>("30");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [teamFilter, setTeamFilter] = useState("all");
+  const departmentsQuery = trpc.catalog.departments.useQuery(undefined, { enabled: Boolean(user), staleTime: 60_000 });
+  const teamsQuery = trpc.catalog.teams.useQuery(departmentFilter === "all" ? undefined : { departmentId: Number(departmentFilter) }, { enabled: Boolean(user), staleTime: 60_000 });
   const ticketsQuery = trpc.tickets.list.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000 });
   const policiesQuery = trpc.tickets.slaPolicies.useQuery(undefined, { enabled: Boolean(user), staleTime: 60_000 });
   const workflowEventsQuery = trpc.tickets.workflowEvents.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000 });
@@ -59,7 +63,11 @@ export default function KPIs() {
     const now = Date.now();
     const days = period === "all" ? null : Number(period);
     const cutoff = days === null ? null : now - days * 24 * 60 * 60 * 1000;
-    const tickets = rows.filter(ticket => cutoff === null || new Date(ticket.createdAt).getTime() >= cutoff);
+    const tickets = rows.filter(ticket =>
+      (cutoff === null || new Date(ticket.createdAt).getTime() >= cutoff) &&
+      (departmentFilter === "all" || ticket.departmentId === Number(departmentFilter)) &&
+      (teamFilter === "all" || ticket.teamId === Number(teamFilter))
+    );
     const count = (status: TicketStatus) => tickets.filter(ticket => ticket.status === status).length;
     const active = tickets.filter(ticket => ticket.status !== "resolved" && ticket.status !== "closed");
     const completed = tickets.filter(ticket => ticket.status === "resolved" || ticket.status === "closed");
@@ -134,6 +142,26 @@ export default function KPIs() {
       }
     }
 
+    const departmentNames = new Map((departmentsQuery.data ?? []).map(item => [item.id, item.name]));
+    const teamNames = new Map((teamsQuery.data ?? []).map(item => [item.id, item.name]));
+    const buildBreakdown = (key: "departmentId" | "teamId", names: Map<number, string>) => {
+      const groups = new Map<number, typeof tickets>();
+      for (const ticket of tickets) {
+        const id = ticket[key];
+        if (id == null) continue;
+        const group = groups.get(id) ?? [];
+        group.push(ticket);
+        groups.set(id, group);
+      }
+      return Array.from(groups.entries()).map(([id, group]) => {
+        const resolved = group.filter(ticket => ticket.resolvedAt && new Date(ticket.resolvedAt).getTime() >= new Date(ticket.createdAt).getTime());
+        const avgHours = resolved.length ? resolved.reduce((sum, ticket) => sum + (new Date(ticket.resolvedAt!).getTime() - new Date(ticket.createdAt).getTime()), 0) / resolved.length / 3_600_000 : null;
+        return { id, name: names.get(id) ?? (key === "departmentId" ? "Setor não identificado" : "Equipe não identificada"), total: group.length, active: group.filter(ticket => ticket.status !== "resolved" && ticket.status !== "closed").length, closed: group.filter(ticket => ticket.status === "closed").length, avgHours };
+      }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+    };
+    const departmentBreakdown = buildBreakdown("departmentId", departmentNames);
+    const teamBreakdown = buildBreakdown("teamId", teamNames);
+
     const statusData = (["open", "in_progress", "waiting_requester", "resolved", "closed"] as TicketStatus[])
       .map(status => ({ name: STATUS_LABELS[status], value: count(status), color: statusColors[status] }));
     const priorityData = (["urgent", "high", "medium", "low"] as TicketPriority[])
@@ -155,9 +183,9 @@ export default function KPIs() {
       responseRate: tickets.length ? Math.round(responded.length / tickets.length * 100) : 0,
       averageResolutionHours, averageRequesterValidationHours, reopenedCount, unassigned, urgentActive, pendingApproval, breached, monitored, atRisk,
       slaCompliance: monitored ? Math.round((monitored - breached) / monitored * 100) : null,
-      statusData, priorityData, trend,
+      statusData, priorityData, trend, departmentBreakdown, teamBreakdown,
     };
-  }, [rows, period, policiesQuery.data, workflowEventsQuery.data]);
+  }, [rows, period, departmentFilter, teamFilter, departmentsQuery.data, teamsQuery.data, policiesQuery.data, workflowEventsQuery.data]);
 
   if (loading) return <div className="p-10 text-sm text-[var(--app-muted-foreground)]">Carregando indicadores…</div>;
   if (!user) return <div className="p-10 text-sm">Entre no TicketFlow para acessar os KPIs.</div>;
@@ -170,8 +198,20 @@ export default function KPIs() {
           <h1 className="mt-2 text-3xl font-bold tracking-tight">KPIs do fluxo de chamados</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--app-muted-foreground)]">Visão ponta a ponta: entrada, atendimento, aprovação, resolução, validação do solicitante e cumprimento de SLA.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-[var(--app-muted-foreground)]">Período de abertura</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2"><span className="text-xs text-[var(--app-muted-foreground)]">Setor</span>
+            <Select value={departmentFilter} onValueChange={value => { setDepartmentFilter(value); setTeamFilter("all"); }}>
+              <SelectTrigger className="w-44"><SelectValue placeholder="Todos os setores" /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Todos os setores</SelectItem>{(departmentsQuery.data ?? []).map(item => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2"><span className="text-xs text-[var(--app-muted-foreground)]">Equipe</span>
+            <Select value={teamFilter} onValueChange={setTeamFilter}>
+              <SelectTrigger className="w-44"><SelectValue placeholder="Todas as equipes" /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Todas as equipes</SelectItem>{(teamsQuery.data ?? []).map(item => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <span className="text-xs text-[var(--app-muted-foreground)]">Período</span>
           <Select value={period} onValueChange={value => setPeriod(value as Period)}>
             <SelectTrigger className="w-40"><SelectValue placeholder="Período" /></SelectTrigger>
             <SelectContent><SelectItem value="30">Últimos 30 dias</SelectItem><SelectItem value="90">Últimos 90 dias</SelectItem><SelectItem value="all">Todo o período</SelectItem></SelectContent>
@@ -179,8 +219,8 @@ export default function KPIs() {
         </div>
       </div>
 
-      {(ticketsQuery.isLoading || policiesQuery.isLoading || workflowEventsQuery.isLoading) && <div className="text-xs text-[var(--app-muted-foreground)]">Atualizando indicadores…</div>}
-      {(ticketsQuery.isError || policiesQuery.isError || workflowEventsQuery.isError) && <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-500">Não foi possível carregar todos os indicadores. Atualize a página ou tente novamente.</div>}
+      {(ticketsQuery.isLoading || policiesQuery.isLoading || workflowEventsQuery.isLoading || departmentsQuery.isLoading || teamsQuery.isLoading) && <div className="text-xs text-[var(--app-muted-foreground)]">Atualizando indicadores…</div>}
+      {(ticketsQuery.isError || policiesQuery.isError || workflowEventsQuery.isError || departmentsQuery.isError || teamsQuery.isError) && <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-500">Não foi possível carregar todos os indicadores. Atualize a página ou tente novamente.</div>}
 
       <section>
         <div className="mb-3 flex items-center gap-2"><Gauge className="size-4 text-[#ed1b36]" /><h2 className="text-sm font-semibold">Resumo executivo</h2><Badge variant="outline">{data.total} chamados no período</Badge></div>
@@ -190,6 +230,18 @@ export default function KPIs() {
           <MetricCard title="Resolvidos ou encerrados" value={data.completed} detail={`${data.resolutionRate}% do volume do período`} icon={CheckCircle2} tone="green" />
           <MetricCard title="Tempo médio até resolução" value={data.averageResolutionHours === null ? "N/D" : `${data.averageResolutionHours.toFixed(1)} h`} detail="Somente chamados com resolvedAt válido" icon={Timer} tone="purple" />
         </div>
+      </section>
+
+
+      <section className="grid gap-5 xl:grid-cols-2">
+        <Card className="border-[var(--app-border)] bg-[var(--app-card)]">
+          <CardHeader><CardTitle className="text-base">Desempenho por setor</CardTitle><p className="text-xs text-[var(--app-muted-foreground)]">Volume, backlog e tempo médio de resolução por setor, no período e filtros selecionados.</p></CardHeader>
+          <CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-[var(--app-border)] text-left text-xs text-[var(--app-muted-foreground)]"><th className="py-2 pr-3">Setor</th><th className="py-2 px-2 text-right">Recebidos</th><th className="py-2 px-2 text-right">Ativos</th><th className="py-2 px-2 text-right">Encerrados</th><th className="py-2 pl-2 text-right">Média resolução</th></tr></thead><tbody>{data.departmentBreakdown.length ? data.departmentBreakdown.map(item => <tr key={item.id} className="border-b border-[var(--app-border)] last:border-0"><td className="py-3 pr-3 font-medium">{item.name}</td><td className="px-2 text-right tabular-nums">{item.total}</td><td className="px-2 text-right tabular-nums">{item.active}</td><td className="px-2 text-right tabular-nums">{item.closed}</td><td className="pl-2 text-right tabular-nums">{item.avgHours === null ? "N/D" : item.avgHours.toFixed(1) + " h"}</td></tr>) : <tr><td colSpan={5} className="py-6 text-center text-xs text-[var(--app-muted-foreground)]">Sem dados para os filtros selecionados.</td></tr>}</tbody></table></div></CardContent>
+        </Card>
+        <Card className="border-[var(--app-border)] bg-[var(--app-card)]">
+          <CardHeader><CardTitle className="text-base">Desempenho por equipe</CardTitle><p className="text-xs text-[var(--app-muted-foreground)]">Comparativo das equipes visíveis para o usuário autenticado.</p></CardHeader>
+          <CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-[var(--app-border)] text-left text-xs text-[var(--app-muted-foreground)]"><th className="py-2 pr-3">Equipe</th><th className="py-2 px-2 text-right">Recebidos</th><th className="py-2 px-2 text-right">Ativos</th><th className="py-2 px-2 text-right">Encerrados</th><th className="py-2 pl-2 text-right">Média resolução</th></tr></thead><tbody>{data.teamBreakdown.length ? data.teamBreakdown.map(item => <tr key={item.id} className="border-b border-[var(--app-border)] last:border-0"><td className="py-3 pr-3 font-medium">{item.name}</td><td className="px-2 text-right tabular-nums">{item.total}</td><td className="px-2 text-right tabular-nums">{item.active}</td><td className="px-2 text-right tabular-nums">{item.closed}</td><td className="pl-2 text-right tabular-nums">{item.avgHours === null ? "N/D" : item.avgHours.toFixed(1) + " h"}</td></tr>) : <tr><td colSpan={5} className="py-6 text-center text-xs text-[var(--app-muted-foreground)]">Sem dados para os filtros selecionados.</td></tr>}</tbody></table></div></CardContent>
+        </Card>
       </section>
 
       <section>
