@@ -14,8 +14,8 @@ export const ENV = {
   get supabaseUrl() { return process.env.SUPABASE_URL ?? ""; },
   get supabaseServiceRoleKey() { return process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""; },
   get supabaseStorageBucket() { return process.env.SUPABASE_STORAGE_BUCKET ?? "ticket-attachments"; },
-  get gmailOAuthClientId() { return process.env.GMAIL_OAUTH_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? process.env.GMAIL_CLIENT_ID ?? process.env.GOOGLE_CLIENT_ID ?? ""; },
-  get gmailOAuthClientSecret() { return process.env.GMAIL_OAUTH_CLIENT_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? process.env.GMAIL_CLIENT_SECRET ?? process.env.GOOGLE_CLIENT_SECRET ?? ""; },
-  get gmailOAuthRefreshToken() { return process.env.GMAIL_OAUTH_REFRESH_TOKEN ?? process.env.GOOGLE_OAUTH_REFRESH_TOKEN ?? process.env.GMAIL_REFRESH_TOKEN ?? process.env.GOOGLE_REFRESH_TOKEN ?? ""; },
-  get gmailUserEmail() { return process.env.GMAIL_USER_EMAIL ?? process.env.GMAIL_FROM ?? ""; },
+  get gmailOAuthClientId() { return process.env.GMAIL_OAUTH_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? process.env.GMAIL_CLIENT_ID ?? process.env.GOOGLE_CLIENT_ID ?? process.env.PasswordRecovery_Gmail_ClientId ?? ""; },
+  get gmailOAuthClientSecret() { return process.env.GMAIL_OAUTH_CLIENT_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? process.env.GMAIL_CLIENT_SECRET ?? process.env.GOOGLE_CLIENT_SECRET ?? process.env.PasswordRecovery_Gmail_ClientSecret ?? ""; },
+  get gmailOAuthRefreshToken() { return process.env.GMAIL_OAUTH_REFRESH_TOKEN ?? process.env.GOOGLE_OAUTH_REFRESH_TOKEN ?? process.env.GMAIL_REFRESH_TOKEN ?? process.env.GOOGLE_REFRESH_TOKEN ?? process.env.PasswordRecovery_Gmail_RefreshToken ?? ""; },
+  get gmailUserEmail() { return process.env.GMAIL_USER_EMAIL ?? process.env.GMAIL_FROM ?? process.env.PasswordRecovery_Gmail_From ?? ""; },
 };
