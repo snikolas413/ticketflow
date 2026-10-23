@@ -11,8 +11,7 @@ function attachReader(socket: TLSSocket) {
     buffers.set(socket, (buffers.get(socket) ?? "") + chunk.toString("utf8"));
     const pending = waiters.get(socket) ?? [];
     while (pending.length) {
-      const buffer = buffers.get(socket) ?? "";
-      const lines = buffer.split("\r\n");
+      const lines = (buffers.get(socket) ?? "").split("\r\n");
       const end = lines.findIndex(line => /^\d{3} /.test(line));
       if (end < 0) break;
       const reply = lines.slice(0, end + 1).join("\r\n");
@@ -27,8 +26,7 @@ function attachReader(socket: TLSSocket) {
 }
 
 function readReply(socket: TLSSocket): Promise<string> {
-  const buffer = buffers.get(socket) ?? "";
-  const lines = buffer.split("\r\n");
+  const lines = (buffers.get(socket) ?? "").split("\r\n");
   const end = lines.findIndex(line => /^\d{3} /.test(line));
   if (end >= 0) {
     buffers.set(socket, lines.slice(end + 1).join("\r\n"));
@@ -46,9 +44,74 @@ async function command(socket: TLSSocket, value?: string, accepted: number[] = [
   return reply;
 }
 
-export async function sendPasswordResetEmail(to: string, resetUrl: string) {
-  if (!ENV.smtpUser || !ENV.smtpPass || !ENV.smtpFrom) throw new Error("SMTP Gmail não configurado no ambiente");
-  if (ENV.smtpPort !== 465) throw new Error("A configuração Gmail exige SMTP_PORT=465 (TLS)");
+function base64Url(value: string) {
+  return Buffer.from(value, "utf8").toString("base64url");
+}
+
+async function sendWithGmailOAuth(to: string, resetUrl: string) {
+  const clientId = ENV.gmailOAuthClientId;
+  const clientSecret = ENV.gmailOAuthClientSecret;
+  const refreshToken = ENV.gmailOAuthRefreshToken;
+  const from = ENV.gmailUserEmail;
+
+  if (!clientId || !clientSecret || !refreshToken || !from) {
+    throw new Error("Gmail OAuth incompleto: configure client ID, client secret, refresh token e e-mail remetente no Render.");
+  }
+
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!tokenResponse.ok) {
+    throw new Error(`Gmail OAuth não conseguiu renovar o token (HTTP ${tokenResponse.status}). Confira client ID/secret, refresh token e permissões OAuth.`);
+  }
+
+  const tokenData = await tokenResponse.json() as { access_token?: string };
+  if (!tokenData.access_token) throw new Error("Gmail OAuth não retornou access token.");
+
+  const message = [
+    `From: TicketFlow <${from}>`,
+    `To: <${to}>`,
+    "Subject: Recuperação de senha do TicketFlow",
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    Buffer.from([
+      "Recebemos uma solicitação para redefinir sua senha do TicketFlow.",
+      "",
+      "Use o link abaixo em até 30 minutos. Ele pode ser utilizado uma única vez:",
+      resetUrl,
+      "",
+      "Se você não solicitou esta alteração, ignore este e-mail.",
+    ].join("\r\n"), "utf8").toString("base64").replace(/.{1,76}/g, "$&\r\n").trim(),
+    "",
+  ].join("\r\n");
+
+  const sendResponse = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${tokenData.access_token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ raw: base64Url(message) }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!sendResponse.ok) {
+    throw new Error(`Gmail API recusou o envio (HTTP ${sendResponse.status}). Verifique se a API Gmail está habilitada e se o OAuth tem o escopo gmail.send.`);
+  }
+}
+
+async function sendWithSmtp(to: string, resetUrl: string) {
+  if (!ENV.smtpUser || !ENV.smtpPass || !ENV.smtpFrom) throw new Error("Gmail não configurado: informe as credenciais OAuth ou as variáveis SMTP.");
+  if (ENV.smtpPort !== 465) throw new Error("A configuração Gmail SMTP exige SMTP_PORT=465 (TLS).");
   const socket = connectTls({ host: ENV.smtpHost, port: ENV.smtpPort, servername: ENV.smtpHost });
   attachReader(socket);
   socket.setTimeout(15000, () => socket.destroy(new Error("Tempo limite SMTP excedido")));
@@ -101,4 +164,13 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   } finally {
     socket.end();
   }
+}
+
+export async function sendPasswordResetEmail(to: string, resetUrl: string) {
+  const hasAnyOAuthSetting = Boolean(ENV.gmailOAuthClientId || ENV.gmailOAuthClientSecret || ENV.gmailOAuthRefreshToken);
+  if (hasAnyOAuthSetting) {
+    await sendWithGmailOAuth(to, resetUrl);
+    return;
+  }
+  await sendWithSmtp(to, resetUrl);
 }
