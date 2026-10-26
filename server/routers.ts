@@ -47,12 +47,17 @@ export const appRouter = router({
     }),
     requestPasswordReset: publicProcedure.input(z.object({ email: z.string().email().max(320) })).mutation(async ({ input }) => {
       let stage = "creating reset token";
+      console.info("[Password reset] Request handler started");
       try {
         const request = await createPasswordResetToken(input.email);
         if (request) {
+          console.info("[Password reset] Eligible account found; reset token created");
           stage = "sending reset email";
           const baseUrl = (process.env.APP_BASE_URL ?? "https://ticketflow-j2e5.onrender.com").replace(/\/$/, "");
           await sendPasswordResetEmail(request.email, `${baseUrl}/reset-password?token=${encodeURIComponent(request.token)}`);
+          console.info("[Password reset] Email delivery accepted by Gmail API");
+        } else {
+          console.info("[Password reset] No eligible account found; no email was sent");
         }
       } catch (error) {
         const detail = error instanceof Error
