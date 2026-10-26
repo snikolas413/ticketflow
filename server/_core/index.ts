@@ -16,6 +16,17 @@ import { getDb } from "../db";
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Safe diagnostics for password recovery: never log submitted emails or tokens.
+  app.use((req, res, next) => {
+    if (req.path === "/api/trpc/auth.requestPasswordReset") {
+      const startedAt = Date.now();
+      console.info("[Password reset] API request received");
+      res.on("finish", () => {
+        console.info(`[Password reset] API response completed (HTTP ${res.statusCode}, ${Date.now() - startedAt}ms)`);
+      });
+    }
+    next();
+  });
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
